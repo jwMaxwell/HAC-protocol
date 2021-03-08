@@ -1,0 +1,17 @@
+# HAC Protocol
+
+Authors:
+  * Joshua Maxwell
+  * Cameron Krueger
+  
+## Overview
+This project creates a [HAC protocol](https://en.wikipedia.org/wiki/High-availability_cluster) in Java. As a HAC protocol, it is made to detect node failure, inform the other nodes in the network about the failure, detect when a failed node comes back to life, and inform the other nodes about the availability of a new node. Upon launch of the program, you will be propted to choose whether you want to boot into server mode, P2P mode, or client mode.
+
+## Server mode
+In server mode, your computer/network will act as a server for other nodes/clients to connect to. The server has a couple internal commands, which are unaccessable by the user. When the client sends a "JOIN" command, the server will respond with a "GOTO" command. The "GOTO" command tells the client what type of hosting is being used (server or P2P) as well as what IP address and port number to connect to. When the client sends the "BACK" command, the server will know that the client is back online and will respond by sending the client the messages that it lost. Finally, whenever the client sends a message that is anything other than a command, the server will respond with a "PING" to let the client know that the server has not failed.
+ 
+## P2P mode
+P2P mode is the most complicated of the modes. It must act as both a server and a client. In P2P mode, the host system, will have the same functionality as the clients but it will also keep track and deal with new clients. Because this mode acts as both a client and a server, it will use all of the commands. When the P2P host recieves a "JOIN" command, it will know that a client is requesting to join the network. The host will then add the client to the list of known clients and then sending the client a "GOTO" command, telling the client what type of hosting is being used, which clients to listen to, and which clients to send data to. Once the client has joined the network, the host will send a "NOOB" command, informing the other clients of the newly available client. When the host detects that one of the clients has failed or is no longer responding, the host will send a "WTF" command to the other clients. Whenever a client comes back to life, they will send out a "BACK" command, informing the other clients that they are available again. When this happens, the host will resend the messages that they missed. Finally, whenever a client sends a non-command message to the host, the host will respond with a ping, informing the other client that the message was received and that the host is still active.
+
+## Client mode
+All client mode does is respond to server/host messages and commands. Client mode also has commands which are not accessable to the user. When the client first contacts the server/host, it will send a "JOIN" command, letting the server/host know that it is requesting access to the network. The server/host will respond to the "JOIN" command with a "GOTO" command, which tells the client what hosting mode is being used, what IP addresses and port numbers it should listen to, and what IP addresses and nodes it should send to. Whenever a client detects that another client has failed, it will send a "WTF" command to the other nodes in the network, letting them know that the given node has failed. When/if that node comes back to life, it will send a "BACK" command letting the other nodes know that it is available again. 
