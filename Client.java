@@ -24,10 +24,6 @@ public class Client {
   Node child = null;
   ArrayList<Node> nodes = new ArrayList<Node>();
   
-  /*
-   * Probably going to need some arraylists for host(s)/children
-   */
-  
   /**
    * constructor connects to the host
    * @throws IOException 
@@ -66,7 +62,18 @@ public class Client {
         
         System.out.println("Response from server:" + response);
         
-        
+        switch(response.split("//s+")[0]) {
+          case "WTF":
+          case "BACK":
+          case "PING":
+          case "FUCC":
+            send("PING", this.parent.getIp(), this.parent.getPort());
+            break;
+          default:
+            send("PING", this.parent.getIp(), this.parent.getPort());
+            send(response, this.child.getIp(), this.child.getPort());
+            break;
+        }
       }
     }
     catch (IOException e) 
