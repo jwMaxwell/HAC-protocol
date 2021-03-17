@@ -53,6 +53,8 @@ public class Client {
   {
     try 
     {
+      new SendPingyBois().run();
+      new AreYouThere().run();
       while(true) {
         new AreYouThere().run();
         
