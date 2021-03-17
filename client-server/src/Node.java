@@ -1,6 +1,5 @@
 /**
  * @author Joshua Maxwell
- * @author Cameron Krueger
  * @version March 7, 2021
  * This class holds the information about a given node.
  * This is essentially a struct with extra steps
