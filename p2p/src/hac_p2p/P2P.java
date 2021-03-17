@@ -14,7 +14,6 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.Random;
-import java.util.regex.*;
 
 public class P2P {
 
@@ -41,6 +40,9 @@ public class P2P {
 	private static enum Commands {
 		QUIT, DISPLAY, INVALID, NONE;
 	}
+	
+	// Universal input scanner
+	static Scanner input = null;
 
 	/**
 	 * It really do just be the main method tho
@@ -53,8 +55,9 @@ public class P2P {
 		if (args.length > 0 && args[0] != null) {
 			cfgPath = args[0];
 		}
-
+		
 		loadConfig(cfgPath);
+		input = new Scanner(System.in);
 
 		// Loop control, for use later
 		// In current implementation, will never be true
@@ -63,9 +66,6 @@ public class P2P {
 		// RNG for timing pings
 		Random random = new Random();
 
-		// Input scanner
-		Scanner input = new Scanner(System.in);
-
 		// Store last time the nodeIndex was displayed
 		long lastDisplay = System.currentTimeMillis();
 
@@ -73,6 +73,7 @@ public class P2P {
 		while (!quit) {
 			// Ping all known hosts to let them know you've arrived
 			System.out.println("Pinging all nodes");
+			System.out.println();
 			pingAll();
 
 			// The amount of time spent receiving/accepting commands
@@ -154,33 +155,28 @@ public class P2P {
 				// Check for user input and if available, parse for command
 				String usrIn = null;
 				Commands command = Commands.NONE;
-				if (System.in.available() != 0) {
-					usrIn = input.next();
-					command = parseCommand(usrIn);
+				if (System.in.available() > 0) {
+					usrIn = input.nextLine();
+					// Skip if user entered whitespace
+					if (!usrIn.isBlank()) {
+						command = parseCommand(usrIn);
+					}
 				}
 
 				// Handle a command from the user
 				switch (command) {
 				case QUIT:
-					System.out.print("Really quit? (y/n) ");
-					if (input.next().strip().toLowerCase().equals("y")) {
-						System.out.println("Terminating...");
-						System.exit(0);
-					} else if (input.next().strip().toLowerCase().equals("n")) {
-						System.out.println("Aborting.");
-					} else {
-						System.out.println("Invalid choice.");
-						System.out.println("Aborting.");
-					}
+					stdTerm(true, 0);
 					break;
 
 				case DISPLAY:
 					lastDisplay = System.currentTimeMillis();
+					System.out.println();
 					displayNodes();
 					break;
 
 				case INVALID:
-					System.out.println("Invalid command.");
+					System.out.println("Invalid command.\n");
 					break;
 
 				default: // Also handles Commands.NONE
@@ -203,7 +199,7 @@ public class P2P {
 			cfgScanner = new Scanner(cfgFile);
 		} catch (FileNotFoundException e) {
 			System.err.println("Error: " + path + " does not exist or you do not have permission to access it.");
-			System.exit(1);
+			stdTerm(false, 1); // Exit with error code 1
 		}
 
 		// Load each address into a new node in nodeIndex
@@ -211,7 +207,14 @@ public class P2P {
 		while (cfgScanner.hasNextLine()) {
 			lineNumber++;
 			String line = cfgScanner.nextLine();
-			String tokens[] = line.split(",");	// Separate line on comma
+			
+			// Skip comments and blank lines
+			if (line.startsWith("#") || line.isBlank() || line.isEmpty()) {
+				continue;
+			}
+			
+			// Separate line on comma (basically CSV)
+			String tokens[] = line.split(",");
 			
 			// If there are not two tokens, alert user
 			if (tokens.length < 2) {
@@ -221,6 +224,9 @@ public class P2P {
 			
 			// Try to make an InetAddress object to see if IP token is valid
 			try {
+				// Must actually assign the value to make this throw an
+				//  exception. Suppress unused variable warning.
+				@SuppressWarnings("unused")
 				InetAddress tmp = Inet4Address.getByName(tokens[0]);
 			} catch (UnknownHostException e) {
 				System.err.println("Error: Incorrect configuration file format at line " + lineNumber + ".");
@@ -249,7 +255,7 @@ public class P2P {
 		if (nodeIndex.size() == 0) {
 			System.err.println("Error: No nodes provided in configuration file.");
 			System.out.println("Terminating...");
-			System.exit(2);
+			stdTerm(false, 2);	// Exit with error code 2
 		}
 	}
 
@@ -257,7 +263,7 @@ public class P2P {
 	 * Prints information about all nodes in nodeIndex
 	 */
 	private static void displayNodes() {
-		System.out.println("------ Node Index ------");
+		System.out.println("------------ Node Index ------------");
 		System.out.println(String.format("%-15s  %-6s  %s", "IP", "Status", "TSLC (ms)"));
 
 		// Output node info
@@ -300,6 +306,55 @@ public class P2P {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+		}
+	}
+	
+	
+	/**
+	 * Provides a standard way to terminate. This helps prevent resource leaks
+	 * If confirmation is requested, the user has 5 seconds to respond before
+	 * the program ignores the quit command and continues normally. This is a
+	 * cheap way to prevent "blocking" without using threads
+	 * 
+	 * @param conf true if user confirmation is desired, else false
+	 * @param val the error code value to pass to System.exit()
+	 */
+	public static void stdTerm(boolean conf, int val) {
+		if (conf) {
+			System.out.print("Really quit? Ignoring in 5 seconds... (y/n) ");
+			long tor = System.currentTimeMillis();
+			while (System.currentTimeMillis() - tor < 5000) {
+				try {
+					if (System.in.available() > 0) {
+						String usrIn = input.next().strip().toLowerCase();
+						if (usrIn.equals("y")) {
+							System.out.println("Terminating...");
+							// Close input if still open
+							if (input != null) {
+								input.close();
+							}
+							System.exit(val);
+						} else if (usrIn.equals("n")) {
+							System.out.println("Aborting.\n");
+							return;
+						} else {
+							System.out.println("Invalid choice.");
+							System.out.println("Aborting.\n");
+							return;
+						}
+					}
+				} catch (IOException e) {
+					System.err.println("Error: Unknown IO error while waiting for input.");
+					return;
+				}
+			}
+			System.out.println("\nNo response. Continuing...\n");
+		} else {
+			// Close input if still open
+			if (input != null) {
+				input.close();
+			}
+			System.exit(val);
 		}
 	}
 

@@ -10,7 +10,6 @@
  
 package hac_p2p;
 
-import java.io.IOException;
 import java.net.*;
  
 final class Node {
