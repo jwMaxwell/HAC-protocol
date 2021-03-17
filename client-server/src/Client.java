@@ -3,12 +3,6 @@
  * @version March 7, 2021
  * This program acts as a client which will be connected
  * to either a host (P2P) or a server
- * 
- * TODO
- * 2. Implement the PING message
- * 3. Implement the BACK message
- * 4. Implement the WTF command
- * 
  */
 
 package hac_server;
