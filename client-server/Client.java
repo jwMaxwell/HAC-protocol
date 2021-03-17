@@ -12,17 +12,18 @@
  * 
  */
 
-package hac_protocol;
+package hac_server;
 
 import java.io.IOException;
 import java.net.*;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 
 public class Client {
   DatagramSocket socket = null;
   Node parent = null;
-  Node child = null;
-  ArrayList<Node> nodes = new ArrayList<Node>();
+  boolean gotPackyBoi = false;
+  final int PACKET_SIZE = 1028;
   
   /**
    * constructor connects to the host
@@ -37,7 +38,7 @@ public class Client {
     
     //waiting for that GOTO msg
     DatagramPacket incomingPacket = 
-        new DatagramPacket(new byte[Boot.PACKET_SIZE], Boot.PACKET_SIZE);
+        new DatagramPacket(new byte[PACKET_SIZE], PACKET_SIZE);
     socket.receive(incomingPacket);
     String response = new String(incomingPacket.getData());
     
@@ -56,22 +57,19 @@ public class Client {
     {
       while(true) {
         DatagramPacket incomingPacket = 
-            new DatagramPacket(new byte[Boot.PACKET_SIZE], Boot.PACKET_SIZE);
+            new DatagramPacket(new byte[PACKET_SIZE], PACKET_SIZE);
         socket.receive(incomingPacket);
+        gotPackyBoi = true;
         String response = new String(incomingPacket.getData());
         
         System.out.println("Response from server:" + response);
         
         switch(response.split("//s+")[0]) {
-          case "WTF":
-          case "BACK":
-          case "PING":
           case "FUCC":
             send("PING", this.parent.getIp(), this.parent.getPort());
             break;
           default:
             send("PING", this.parent.getIp(), this.parent.getPort());
-            send(response, this.child.getIp(), this.child.getPort());
             break;
         }
       }
@@ -90,15 +88,11 @@ public class Client {
     if(hostType.equals("SERVER")) {
       this.parent = new Node(p.getAddress(), p.getPort());
     }
-    //checks if host is a node in a p2p server
-    else if(hostType.equals("P2P")) {
-      this.parent = new Node(InetAddress.getByAddress(tokens[2].getBytes()),
-          Integer.parseInt(tokens[3]));
-      
-      this.child = tokens.length > 4 ? 
-          new Node(InetAddress.getByAddress(tokens[4].getBytes()),
-              Integer.parseInt(tokens[5])) : null;
-    }
+  }
+  
+  private void yikes() {
+    // give up on life
+    System.exit(-1);
   }
   
   /**
@@ -126,6 +120,95 @@ public class Client {
     this.socket.close();
   }
   
+  /**
+   * @author josh
+   * makes sure the server is alive
+   */
+  class AreYouThere extends Thread {
+    /*
+     * This is the longest time that the client will wait for a response
+     * before giving up on life. This is in milliseconds and so
+     * when we go through the conversion process, we will find that
+     * this is equal to exactly equal to 30 seconds, which just so
+     * happens to be the amount of time that we want to wait before
+     * the client simply gives up on life
+     */
+    private static final long LONGEST_TIME = 30000;
+    
+    /**
+     * This is the function that runs on a separate thread while the rest
+     * of the program goes about its own business. All this does is wait and
+     * see if the server responds within the allotted amount of time. If the
+     * server does not respond fast enough, the client will give up and die
+     * or something.
+     */
+    @Override
+    public void run() {
+      /*
+       * I don't really know why I need this. I probably don't. Eclipse just
+       * kind slapped this bad boy in here for whatever reason. I generally 
+       * don't really use threads so I don't know whether or not this is
+       * really needed for the thread to work
+       */
+      super.run();
+      /*
+       * This is the amount of time that the client should wait. This is a 
+       * separate variable that we can use in case we need to extend the 
+       * amount of time we should for wait
+       */
+      long timeForWait = LONGEST_TIME;
+      /*
+       * Fun fact: tiempo probably means time in Spanish. This is an apt
+       * name because this variable holds the start time. This is used
+       * to help the while loop figure out when it should fall into a 
+       * deep depression and temporary sleep. It wouldn't be forever
+       * because at some point this while loop would probably do stuff
+       * again
+       */
+      long tiempo = System.currentTimeMillis();
+      /*
+       * This while loop is used to figure out whether or not the server
+       * responded in an appropriate amount of time. If the server didn't
+       * respond in the proper amount of time, we can go ahead and assume
+       * that it has failed and that we need to wait for it to come back
+       * online. The comparison function that the loop uses calculates if
+       * the current time is larger that the start time plus the time that
+       * it should wait.
+       */
+      while(!(System.currentTimeMillis() > tiempo + timeForWait)) {
+        /*
+         * This checks to see if a packet (also known as a packy boi) was
+         * recieved. If one wasn't recieved, then the loop will keep on
+         * skadoodling, otherwise, it will reset the "gotPackyBoi" 
+         * variable and add some more time to the clock
+         */
+        if(gotPackyBoi) {
+          /*
+           * This resets the variable to the original value so that it will
+           * be prepared to look for another packet. If this isn't reset
+           * then the client won't work like it is supposed to. It's 
+           * prolly best if you just leave this in here
+           */
+          gotPackyBoi = false;
+          /*
+           * This will add more time to the time to wait for the next
+           * packet (also known as a packy boi) this is so that the
+           * loop keeps on a going. If it doesn't, the client sure
+           * will be confused
+           */
+          timeForWait += LONGEST_TIME;
+        }
+      }
+      /*
+       * Uh-oh spaghettios. If the code got to this point then the
+       * client probably didn't receive a packet in the right amount
+       * of time. If it ever gets to this point, then we can conclude
+       * that the server went and died. That's a big yikes. Hence the
+       * name of the function
+       */
+      yikes();
+    }
+  }
   
   /**
    * @author josh
