@@ -56,6 +56,8 @@ public class Client {
     try 
     {
       while(true) {
+        new AreYouThere().run();
+        
         DatagramPacket incomingPacket = 
             new DatagramPacket(new byte[PACKET_SIZE], PACKET_SIZE);
         socket.receive(incomingPacket);
