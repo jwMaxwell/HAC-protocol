@@ -1,0 +1,9 @@
+# Binaries
+bin/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+/.metadata/
