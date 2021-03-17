@@ -1,6 +1,5 @@
 /**
  * @author Joshua Maxwell
- * @author Cameron Krueger
  * @version March 7, 2021
  * This program acts as a client which will be connected
  * to either a host (P2P) or a server
