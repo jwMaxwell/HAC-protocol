@@ -14,6 +14,7 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.Random;
+import java.util.regex.*;
 
 public class P2P {
 
@@ -133,9 +134,9 @@ public class P2P {
 				String packetDataString = new String(incomingPacket.getData()).strip().toLowerCase();
 				if (packetDataString.contains("ping")) {
 					for (Node n : nodeIndex) {
-						if (n.ip.equals(senderIP)) {
-							n.online = true;
-							n.tolc = System.currentTimeMillis();
+						if (n.getAddress().equals(senderIP)) {
+							n.setOnline(true);
+							n.setTolc(System.currentTimeMillis());
 							// System.out.println("Ping received"); // DEBUG
 							break;
 						}
@@ -146,7 +147,7 @@ public class P2P {
 				// milliseconds, it is considered dead
 				for (Node n : nodeIndex) {
 					if (n.getTSLC() > NODE_TIMEOUT) {
-						n.online = false;
+						n.setOnline(false);
 					}
 				}
 
@@ -206,8 +207,49 @@ public class P2P {
 		}
 
 		// Load each address into a new node in nodeIndex
+		int lineNumber = 0;
 		while (cfgScanner.hasNextLine()) {
-			nodeIndex.add(new Node(cfgScanner.nextLine()));
+			lineNumber++;
+			String line = cfgScanner.nextLine();
+			String tokens[] = line.split(",");	// Separate line on comma
+			
+			// If there are not two tokens, alert user
+			if (tokens.length < 2) {
+				System.err.println("Error: Incorrect configuration file format at line " + lineNumber + ".");
+				continue;	// Don't add invalid node
+			}
+			
+			// Try to make an InetAddress object to see if IP token is valid
+			try {
+				InetAddress tmp = Inet4Address.getByName(tokens[0]);
+			} catch (UnknownHostException e) {
+				System.err.println("Error: Incorrect configuration file format at line " + lineNumber + ".");
+				System.err.println(tokens[0] + ": not a valid IP address or hostname.");
+				continue;	// Don't add invalid node
+			}
+			
+			// If port number is not valid
+			try {
+				int port = Integer.parseInt(tokens[1].strip());
+				if (port > 65536 || port < 0) {
+					throw new NumberFormatException();
+				}
+			} catch (NumberFormatException e) {
+				System.err.println("Error: Incorrect configuration file format at line " + lineNumber + ".");
+				System.err.println(tokens[1] + ": not a valid port number.");
+				continue;	// Don't add invalid node
+			}
+			
+			// Add the node to the index
+			nodeIndex.add(new Node(tokens[0].strip(), port));
+		}
+		
+		// Warn and exit if no node records were provided in the configuration 
+		//  file
+		if (nodeIndex.size() == 0) {
+			System.err.println("Error: No nodes provided in configuration file.");
+			System.out.println("Terminating...");
+			System.exit(2);
 		}
 	}
 
@@ -220,14 +262,18 @@ public class P2P {
 
 		// Output node info
 		for (Node n : nodeIndex) {
-			String status = n.online ? "Up" : "Down";
-			try {
-				System.out.println(
-						String.format("%-15s  %-6s  %d", n.ip.toString().replace("/", ""), status, n.getTSLC()));
-			} catch (IOException e) {
-				System.out.println(
-						String.format("%-15s  %-6s  %d", n.ip.toString().replace("/", ""), "Unknown", (long) -1));
+			String status = n.isOnline() ? "Up" : "Down";
+			String addr = "";
+			
+			// Use host.domain text address if provided
+			if (n.getAddress().toString().substring(0, n.getAddress().toString().indexOf("/")).length() > 0) {
+				addr = n.getAddress().toString().substring(0, n.getAddress().toString().indexOf("/"));
+			} else {
+				addr = n.getAddress().toString().substring(n.getAddress().toString().indexOf("/") + 1);
 			}
+			
+			// Print that b!
+			System.out.println(String.format("%-15s  %-6s  %d", addr, status, n.getTSLC()));
 		}
 	}
 
@@ -244,7 +290,7 @@ public class P2P {
 
 			try {
 				socket = new DatagramSocket(port);
-				socket.connect(n.ip, port);
+				socket.connect(n.getAddress(), port);
 				socket.send(outgoingPacket);
 				socket.close();
 			} catch (UnknownHostException e) {
@@ -273,44 +319,5 @@ public class P2P {
 		} else {
 			return Commands.INVALID;
 		}
-	}
-}
-
-/**
- * @author Cameron Krueger
- * 
- * Node class. Contains basic information about nodes in the cluster such as
- * IP address, availability, and time of last contact (TOLC)
- */
-final class Node {
-	public Inet4Address ip;
-	public boolean online;
-	public long tolc;
-
-	public Node(String ip) {
-		try {
-			// This call will attempt to contact the host at ip
-			this.ip = (Inet4Address) Inet4Address.getByName(ip);
-		} catch (UnknownHostException e) {
-			System.out.println("Unknown host: " + ip);
-		} finally {
-			this.online = false;
-			this.tolc = -1;
-		}
-	}
-
-	/**
-	 * Calculates and returns the time elapsed since contact was last received from
-	 * this node
-	 * 
-	 * @return the time in milliseconds which has elapsed since last contact with
-	 *         this node
-	 * @throws IOException should never happen
-	 */
-	public long getTSLC() throws IOException {
-		if (this.tolc > -1) {
-			return System.currentTimeMillis() - this.tolc;
-		}
-		return -1;
 	}
 }
