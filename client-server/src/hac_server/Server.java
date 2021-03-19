@@ -2,7 +2,7 @@
  * @author Joshua Maxwell
  * @version March 6, 2021
  * 
- * This programs acts as the server mode for the HAC protocol
+ * This program acts as the server mode for the HAC protocol
  * 
  * TODO
  * 1. detect when a client becomes inactive
