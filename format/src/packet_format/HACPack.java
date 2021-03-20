@@ -11,15 +11,19 @@ import java.net.InetAddress;
 public class HACPack {
   private String header = null; //the command
   private String body = null; //the not command
+  private int port;
+  private InetAddress IP;
   
   /**
    * This constructor will accept two strings and turn them into a usable packet
    * @param header the command which the receiver should act upon
    * @param body the body of the command or message
    */
-  public HACPack(String header, String body) {
+  public HACPack(String header, String body, InetAddress IP, int port) {
     this.header = header != null ? header : "NONE";
     this.body = body;
+    this.IP = IP;
+    this.port = port;
   }
   
   /**
@@ -27,9 +31,11 @@ public class HACPack {
    * If you only want to use the body, use HACPack(null, body)
    * @param headerBody the string holding all of the packet data
    */
-  public HACPack(String headerBody){
+  public HACPack(String headerBody, InetAddress IP, int port){
     this.header = headerBody.split("//s+")[0];
     this.body = headerBody.substring(1);
+    this.IP = IP;
+    this.port = port;
   }
   
   /**
@@ -40,23 +46,17 @@ public class HACPack {
     String temp = new String(packet.getData());
     this.header = temp.split("//s+")[0];
     this.body = temp.substring(1);
+    this.IP = packet.getAddress();
+    this.port = packet.getPort();
   }
   
-  /**
-   * Accepts a datagram packet and turns it into a usable packet
-   * @param o Object to be made into a packet
-   */
-  public HACPack(Object o) {
-    /*
-     * In theory, this should use the toString() method of the
-     * HACPack, however, in practice, this may use the default
-     * toString method from the object :(
-     */
-    String temp = o.toString();
-    this.header = temp.split("//s+")[0];
-    this.body = temp.substring(1);
+  public HACPack(HACPack hp) {
+    this.header = hp.header;
+    this.body = hp.body;
+    this.IP = hp.IP;
+    this.port = hp.port;
   }
-  
+
   /**
    * Gets the header text of the packet
    * @return header text
@@ -73,6 +73,14 @@ public class HACPack {
     return this.body;
   }
   
+  public InetAddress getaddress() {
+    return this.IP;
+  }
+  
+  public int getPort() {
+    return this.port;
+  }
+  
   /**
    * Converts HACPack to a DatagramPacket that can be sent by a socket
    * @param IP address of recipient
@@ -85,20 +93,9 @@ public class HACPack {
                               IP,
                               port);
   }
-
-  /**
-   * Checks if the values of this packet are the same as another's
-   * @param hp an object to compare to this
-   * @return honestly, what do you think?
-   */
-  @Override
-  public boolean equals(Object hp) { // I have no idea if this works
-    if(this.getClass().equals(hp.getClass()))
-      return this.header.equals(new HACPack(hp).header) 
-             && this.body.equals(new HACPack(hp).body) 
-             ? true 
-             : false;
-    return false;
+  
+  public HACPack copy() {
+    return new HACPack(this);
   }
   
   /**
@@ -120,6 +117,5 @@ public class HACPack {
   @Override
   public String toString() {
     return this.header + " " + this.body;
-  }
-  
+  } 
 }
