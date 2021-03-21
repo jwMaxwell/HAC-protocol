@@ -1,8 +1,9 @@
 /**
  * @author Joshua Maxwell
+ * @author Cameron Krueger
  * @version March 6, 2021
  * 
- * This program acts as the server mode for the HAC protocol
+ * This programs acts as the server mode for the HAC protocol
  * 
  * TODO
  * 1. detect when a client becomes inactive
@@ -13,15 +14,16 @@
 package hac_server;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 
+import packet_format.HACPack;
+import packet_format.HACSock;
+
 public class Server {
-	DatagramSocket socket = null;
+	HACSock socket = null;
 	ArrayList<Node> nodes = new ArrayList<Node>(); //yikes
 	ArrayList<String> cache = new ArrayList<String>();
 	final int PORT = 9876;
@@ -38,7 +40,7 @@ public class Server {
     try 
     {
       //makes the socket
-      socket = new DatagramSocket(PORT);
+      socket = new HACSock(PORT);
       byte[] incomingData = new byte[PACKET_SIZE];
       
       new SendPings().run();
@@ -47,9 +49,8 @@ public class Server {
       while (true) 
       {
         //listens for shit
-        DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
-        socket.receive(incomingPacket);
-        String message = new String(incomingPacket.getData());
+        HACPack incomingPacket = socket.receive();
+        String message = incomingData.toString();
         InetAddress IPAddress = incomingPacket.getAddress();
         int port = incomingPacket.getPort();
         
@@ -59,21 +60,17 @@ public class Server {
         System.out.println("Client port: " + port);
         
         //split up that bad boy and get the first word
-        String command = message.split("//s+")[0];
+        String command = incomingPacket.getHeader();
         
         if(command.equals("JOIN")) {
-          String reply = goTo(new Node(IPAddress, port)); //says where to go
-          byte[] data = reply.getBytes();
-          DatagramPacket replyPacket =
-                  new DatagramPacket(data, data.length, IPAddress, port);
+          HACPack replyPacket = 
+              new HACPack(goTo(new Node(IPAddress, port)), IPAddress, port);
           
           socket.send(replyPacket);
         }
         else 
           //sends a pingy boi
-          socket.send(
-              new DatagramPacket("PING".getBytes(), "PING".getBytes().length, IPAddress, port)
-              );
+          socket.send(new HACPack("PING", "null", IPAddress, port));
       }
     } 
     catch (SocketException e) 
@@ -129,7 +126,7 @@ public class Server {
           Thread.sleep(temp >= 0 ? temp % MAX_TIME : -temp % MAX_TIME); // sleep for abs(temp % MAX_TIME) millis
           for(Node n : nodes) // for each node in the node list
             socket.send( //send a packet
-              new DatagramPacket("PING".getBytes(), "PING".getBytes().length, n.getIp(), n.getPort()) // ping pong time
+              new HACPack("PING", "null", n.getIp(), n.getPort()) // ping pong time
             );
         } catch (InterruptedException e) { // uh-oh
           System.out.println("lol computer borked");
@@ -185,4 +182,3 @@ public class Server {
     
   }
 }
-
