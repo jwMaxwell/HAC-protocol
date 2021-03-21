@@ -1,8 +1,15 @@
 /**
  * @author Joshua Maxwell
+ * @author Cameron Krueger
  * @version March 7, 2021
  * This program acts as a client which will be connected
  * to either a host (P2P) or a server
+ * 
+ * TODO
+ * 2. Implement the PING message
+ * 3. Implement the BACK message
+ * 4. Implement the WTF command
+ * 
  */
 
 package hac_server;
@@ -11,8 +18,11 @@ import java.io.IOException;
 import java.net.*;
 import java.security.SecureRandom;
 
+import packet_format.HACPack;
+import packet_format.HACSock;
+
 public class Client {
-  DatagramSocket socket = null;
+  HACSock socket = null;
   Node parent = null;
   boolean gotPackyBoi = false;
   final int PACKET_SIZE = 1028;
@@ -23,20 +33,18 @@ public class Client {
    */
   public Client() throws IOException 
   {
-    socket = new DatagramSocket();
+    socket = new HACSock();
     InetAddress IPAddress = InetAddress.getByName("localhost");
     
     send("JOIN", IPAddress, 9876);
     
     //waiting for that GOTO msg
-    DatagramPacket incomingPacket = 
-        new DatagramPacket(new byte[PACKET_SIZE], PACKET_SIZE);
-    socket.receive(incomingPacket);
-    String response = new String(incomingPacket.getData());
+    HACPack incomingPacket = socket.receive();
+    String response = new String(incomingPacket.toString());
     
     System.out.println("Response from server:" + response);
     
-    goTo(new String(incomingPacket.getData()), incomingPacket); //feel free to make this better
+    goTo(incomingPacket.toString(), incomingPacket); //feel free to make this better
     send("PING", this.parent.getIp(), this.parent.getPort());
   }
   
@@ -47,16 +55,12 @@ public class Client {
   {
     try 
     {
-      new SendPingyBois().run();
-      new AreYouThere().run();
       while(true) {
         new AreYouThere().run();
         
-        DatagramPacket incomingPacket = 
-            new DatagramPacket(new byte[PACKET_SIZE], PACKET_SIZE);
-        socket.receive(incomingPacket);
+        HACPack incomingPacket = socket.receive();
         gotPackyBoi = true;
-        String response = new String(incomingPacket.getData());
+        String response = incomingPacket.toString();
         
         System.out.println("Response from server:" + response);
         
@@ -76,7 +80,7 @@ public class Client {
     }
   }
   
-  private void goTo(String s, DatagramPacket p) throws NumberFormatException, UnknownHostException {
+  private void goTo(String s, HACPack p) throws NumberFormatException, UnknownHostException {
     String[] tokens = s.split("//s+");
     String hostType = tokens[1];
     
@@ -99,8 +103,7 @@ public class Client {
    * @return whether or not the message was successfully sent
    */
   private boolean send(String message, InetAddress IPAddress, int port) {
-    byte[] data = message.getBytes();
-    DatagramPacket sendPacket = new DatagramPacket(data, data.length, IPAddress, 9876);
+    HACPack sendPacket = new HACPack(message, IPAddress, 9876);
     try {
       this.socket.send(sendPacket);
       System.out.println("Message sent from client");
@@ -133,7 +136,7 @@ public class Client {
         try {
           Thread.sleep(temp >= 0 ? temp % LONGEST_TIME : -temp % LONGEST_TIME); // sleep for abs(temp % MAX_TIME) millis
           socket.send( //send a packet
-            new DatagramPacket("PING".getBytes(), "PING".getBytes().length, parent.getIp(), parent.getPort()) // ping pong time
+            new HACPack("PING", "null", parent.getIp(), parent.getPort()) // ping pong time
           );
         } catch (InterruptedException e) { // uh-oh
           System.out.println("lol computer borked");
@@ -265,5 +268,4 @@ public class Client {
     Runtime.getRuntime().addShutdownHook(new Exit(client));
     client.createAndListenSocket();
   }
-
 }
