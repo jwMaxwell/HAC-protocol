@@ -1,56 +1,121 @@
+/**
+ * @author Joshu Maxwell
+ * @version March 20, 2021
+ * This class creates forces a packet structure that is compatible with the HAC protocol
+ */
 package packet_format;
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.SocketException;
 
-public class HACSock {
-  DatagramSocket socket = null;
-  private static final int PACKET_SIZE = 1028;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+
+public class HACPack {
+  private String header = null; //the command
+  private String body = null; //the not command
+  private int port;
+  private InetAddress IP;
   
   /**
-   * Constructor initializes a socket
-   * @param port port to connect on
-   * @throws SocketException
+   * This constructor will accept two strings and turn them into a usable packet
+   * @param header the command which the receiver should act upon
+   * @param body the body of the command or message
    */
-  public HACSock(int port) throws SocketException {
-    this.socket = new DatagramSocket(port);
+  public HACPack(String header, String body, InetAddress IP, int port) {
+    this.header = header != null ? header : "NONE";
+    this.body = body;
+    this.IP = IP;
+    this.port = port;
   }
   
   /**
-   * receives incoming packets
-   * @return a HACPack containing the new HACPack
-   * @throws IOException
+   * This constructor will accept a single string and splits it into a usable packet
+   * If you only want to use the body, use HACPack(null, body)
+   * @param headerBody the string holding all of the packet data
    */
-  public HACPack receive() throws IOException {
-    byte[] incomingData = new byte[PACKET_SIZE];
-    DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
-    socket.receive(incomingPacket);
-    return new HACPack(incomingPacket);
+  public HACPack(String headerBody, InetAddress IP, int port){
+    this.header = headerBody.split("//s+")[0];
+    this.body = headerBody.substring(1);
+    this.IP = IP;
+    this.port = port;
   }
   
   /**
-   * sends a packet
-   * @param packet the HACPack to send
-   * @return if false, then the HACPack was incomplete
-   * @throws IOException
+   * Accepts a datagram packet and turns it into a usable packet
+   * @param packet datagram packet to format
    */
-  public boolean send(HACPack packet) throws IOException {
-    if(packet.getaddress() == null || packet.getPort() == 0)
-      return false;
-    
-    socket.send(
-        new DatagramPacket(packet.toString().getBytes(),
-                           packet.toString().getBytes().length,
-                           packet.getaddress(), packet.getPort())
-        );
-    return true;
+  public HACPack(DatagramPacket packet) {
+    String temp = new String(packet.getData());
+    this.header = temp.split("//s+")[0];
+    this.body = temp.substring(1);
+    this.IP = packet.getAddress();
+    this.port = packet.getPort();
+  }
+  
+  public HACPack(HACPack hp) {
+    this.header = hp.header;
+    this.body = hp.body;
+    this.IP = hp.IP;
+    this.port = hp.port;
+  }
+
+  /**
+   * Gets the header text of the packet
+   * @return header text
+   */
+  public String getHeader() {
+    return this.header;
   }
   
   /**
-   * closes the socket
+   * Get the body text of the packet
+   * @return body text
    */
-  public void close() {
-    this.socket.close();
+  public String getBody() {
+    return this.body;
   }
+  
+  public InetAddress getAddress() {
+    return this.IP;
+  }
+  
+  public int getPort() {
+    return this.port;
+  }
+  
+  /**
+   * Converts HACPack to a DatagramPacket that can be sent by a socket
+   * @param IP address of recipient
+   * @param port port number of recipient
+   * @return DatagramPacket representation of this HACPacket
+   */
+  public DatagramPacket build(InetAddress IP, int port) {
+    return new DatagramPacket(this.toString().getBytes(),
+                              this.toString().getBytes().length,
+                              IP,
+                              port);
+  }
+  
+  public HACPack copy() {
+    return new HACPack(this);
+  }
+  
+  /**
+   * Checks if the values of this are equal to the values of another HACPack
+   * @param hp the HACPack to compare with
+   * @return take a guess
+   */
+  public boolean equals(HACPack hp) { // This should work perfectly
+    return this.header.equals(new HACPack(hp).header) 
+           && this.body.equals(new HACPack(hp).body) 
+           ? true 
+           : false;
+  }
+  
+  /**
+   * bippity boppity it's now a string, would you look at that
+   * @return a string representation of this object
+   */
+  @Override
+  public String toString() {
+    return this.header + " " + this.body;
+  } 
 }
