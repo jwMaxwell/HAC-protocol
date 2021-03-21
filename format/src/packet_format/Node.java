@@ -96,10 +96,18 @@ public final class Node {
 	 * @param b a byte array containing node data
 	 * @throws UnknownHostException if the host cannot be found
 	 */
-	public Node(Byte[] b) throws UnknownHostException {
+	public Node(byte[] b) throws UnknownHostException {
 		ArrayList<Byte> tmp = new ArrayList<Byte>();
+		
+		// Must convert byte array to Byte array
+		Byte[] in = new Byte[b.length];
+		int i = 0;
+		for (byte bo: b) {
+			in[i++] = (Byte) bo;
+		}
+		
 		// Populate
-		Collections.addAll(tmp, b);
+		Collections.addAll(tmp, in);
 		
 		// Int is 32 bits wide, but we're only using lower 16, 2 bytes
 		this.id = (tmp.get(0) << 8) + (tmp.get(1));
@@ -229,7 +237,7 @@ public final class Node {
 	/**
 	 * Converts the entire node object to a byte array
 	 */
-	public Byte[] toByteArray() {
+	public byte[] toByteArray() {
 		ArrayList<Byte> tmp = new ArrayList<Byte>();
 		
 		// Int is 32 bits wide, but we're only using lower 16
@@ -268,7 +276,16 @@ public final class Node {
 		tmp.add((byte) ((tslc >> 8) & 0xFF));	// Byte 1
 		tmp.add((byte) (tslc & 0xFF));			// Byte 0
 		
+		// Must convert ArrayList to Byte Array
 		Byte[] b = new Byte[tmp.size()];
-		return tmp.toArray(b);
+		b = tmp.toArray(b);
+		
+		// Now convert Byte array to byte array (Java is terrible)
+		byte[] out = new byte[b.length];
+		int i = 0;
+		for (Byte bo: b) {
+			out[i++] = (byte) bo;
+		}
+		return out;
 	}
 }

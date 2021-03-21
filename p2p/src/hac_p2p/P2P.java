@@ -13,6 +13,11 @@ import java.io.IOException;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Scanner;
+
+import packet_format.*;
+import packet_format.HACPack.MaxDataLengthExceededException;
+import packet_format.HACPack.PacketType;
+
 import java.util.Random;
 
 public class P2P {
@@ -24,7 +29,7 @@ public class P2P {
 	private static int port = 9876;
 
 	// Max packet size
-	private static final int PACKET_SIZE = 1024;
+	private static final int PACKET_SIZE = 65536;
 
 	// Socket receive timeout
 	private static final int RECV_TIMEOUT = 1000;
@@ -40,6 +45,12 @@ public class P2P {
 	private static enum Commands {
 		QUIT, DISPLAY, INVALID, NONE;
 	}
+	
+	// This node's unique ID
+	private static int id = -1;
+	
+	// This node's address
+	private static Inet4Address address = null;
 	
 	// Universal input scanner
 	static Scanner input = null;
@@ -58,6 +69,14 @@ public class P2P {
 		
 		loadConfig(cfgPath);
 		input = new Scanner(System.in);
+		
+		// Try to get IP address
+		try {
+			address = (Inet4Address) Inet4Address.getLocalHost();
+		} catch (UnknownHostException e) {
+			System.err.println("ERROR: Could not get this node's IP address");
+			stdTerm(false, 3);
+		}
 
 		// Loop control, for use later
 		// In current implementation, will never be true
@@ -132,23 +151,29 @@ public class P2P {
 
 				// If PING packet received, update corresponding record in
 				// nodeIndex
-				String packetDataString = new String(incomingPacket.getData()).strip().toLowerCase();
-				if (packetDataString.contains("ping")) {
-					for (Node n : nodeIndex) {
-						if (n.getAddress().equals(senderIP)) {
-							n.setOnline(true);
-							n.setTolc(System.currentTimeMillis());
-							// System.out.println("Ping received"); // DEBUG
-							break;
+				HACPack hacPacket = new HACPack(incomingPacket.getData());
+				switch (hacPacket.getPacketType()) {
+					case PING:
+						for (Node n : nodeIndex) {
+							if (n.getAddress().equals(senderIP)) {
+								n.setStatus(Node.Status.ACTIVE);
+								n.setTOLC(System.currentTimeMillis());
+								// System.out.println("Ping received"); // DEBUG
+								break;
+							}
 						}
-					}
+						break;
+					default:
+						System.err.printf("ERROR: Unknown packet type. Raw byte %x", hacPacket.getPacketType());
+						break;
 				}
 
 				// If a node has not been heard from in more than NODE_TIMEOUT
 				// milliseconds, it is considered dead
 				for (Node n : nodeIndex) {
 					if (n.getTSLC() > NODE_TIMEOUT) {
-						n.setOnline(false);
+						n.setStatus(Node.Status.OFFLINE);
+						notifyAllOfFailure(n);
 					}
 				}
 
@@ -204,6 +229,7 @@ public class P2P {
 
 		// Load each address into a new node in nodeIndex
 		int lineNumber = 0;
+		ArrayList<Integer> idsFound = new ArrayList<Integer>(); 
 		while (cfgScanner.hasNextLine()) {
 			lineNumber++;
 			String line = cfgScanner.nextLine();
@@ -216,10 +242,31 @@ public class P2P {
 			// Separate line on comma (basically CSV)
 			String tokens[] = line.split(",");
 			
-			// If there are not two tokens, alert user
-			if (tokens.length < 2) {
+			// Strip all whitespace
+			for (int i = 0; i < tokens.length; i++) {
+				tokens[i] = tokens[i].strip();
+			}
+			
+			// If there are not three tokens, alert user
+			if (tokens.length < 3) {
 				System.err.println("Error: Incorrect configuration file format at line " + lineNumber + ".");
 				continue;	// Don't add invalid node
+			}
+			
+			// Check for repeat ID numbers
+			int currentId = Integer.parseInt(tokens[0]);
+			for (int id: idsFound) {
+				if (currentId == id) {
+					System.err.println("Error: Incorrect configuration file format at line " + lineNumber + ".");
+					String addr = "[error]";
+					for (Node n: nodeIndex) {
+						if (n.getId() == id) {
+							addr = n.getAddress().toString();
+						}
+					}
+					System.err.println(tokens[0] + ": ID number already assigned to node at " + addr + ".");
+					continue;	// Don't add invalid node
+				}
 			}
 			
 			// Try to make an InetAddress object to see if IP token is valid
@@ -227,27 +274,30 @@ public class P2P {
 				// Must actually assign the value to make this throw an
 				//  exception. Suppress unused variable warning.
 				@SuppressWarnings("unused")
-				InetAddress tmp = Inet4Address.getByName(tokens[0]);
+				InetAddress tmp = Inet4Address.getByName(tokens[1]);
 			} catch (UnknownHostException e) {
 				System.err.println("Error: Incorrect configuration file format at line " + lineNumber + ".");
-				System.err.println(tokens[0] + ": not a valid IP address or hostname.");
+				System.err.println(tokens[1] + ": not a valid IP address or hostname.");
 				continue;	// Don't add invalid node
 			}
 			
 			// If port number is not valid
 			try {
-				int port = Integer.parseInt(tokens[1].strip());
+				int port = Integer.parseInt(tokens[2]);
 				if (port > 65536 || port < 0) {
 					throw new NumberFormatException();
 				}
 			} catch (NumberFormatException e) {
 				System.err.println("Error: Incorrect configuration file format at line " + lineNumber + ".");
-				System.err.println(tokens[1] + ": not a valid port number.");
+				System.err.println(tokens[2] + ": not a valid port number.");
 				continue;	// Don't add invalid node
 			}
 			
+			// Add node's ID to idsFound
+			idsFound.add(currentId);
+			
 			// Add the node to the index
-			nodeIndex.add(new Node(tokens[0].strip(), port));
+			nodeIndex.add(new Node(currentId, tokens[1], port));
 		}
 		
 		// Warn and exit if no node records were provided in the configuration 
@@ -291,7 +341,54 @@ public class P2P {
 		DatagramSocket socket = null;
 
 		for (Node n : nodeIndex) {
-			byte[] outgoingData = "PING".getBytes();
+			byte[] b = {};
+			// Create a HAC ping packet and put it in the data block
+			byte[] outgoingData = null;
+			try {
+				outgoingData = (new HACPack(id, address, PacketType.PING, b)).toByteArray();
+			} catch (MaxDataLengthExceededException e1) {
+				// Ping packets are safe. Will not throw this exception
+				e1.printStackTrace();
+			}
+			DatagramPacket outgoingPacket = new DatagramPacket(outgoingData, outgoingData.length);
+
+			try {
+				socket = new DatagramSocket(port);
+				socket.connect(n.getAddress(), port);
+				socket.send(outgoingPacket);
+				socket.close();
+			} catch (UnknownHostException e) {
+				e.printStackTrace();
+			} catch (SocketException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	/**
+	 * I literally cannot see how this is useful. If there are n nodes in the
+	 * system and all nodes perform this action	simultaneously, network traffic
+	 * would spike by n*n, potentially leading to a cascade of "false positive"
+	 * node failures 
+	 * @param n the node which has failed
+	 */
+	public static void notifyAllOfFailure(Node n) {
+		// Set up socket
+		DatagramSocket socket = null;
+		
+		for (Node node : nodeIndex) {
+			byte[] b = {};
+			// Create a HAC ping packet and put it in the data block
+			byte[] outgoingData = null;
+			try {
+				outgoingData = (new HACPack(id, address, PacketType.STATUS, n.toByteArray()).toByteArray());
+			} catch (MaxDataLengthExceededException e1) {
+				// This mathematicallly cannot happen, as only one node is
+				// being passed to the HACPack constructor 
+				e1.printStackTrace();
+			}
 			DatagramPacket outgoingPacket = new DatagramPacket(outgoingData, outgoingData.length);
 
 			try {

@@ -1,7 +1,9 @@
 /**
  * @author Joshu Maxwell
+ * @author Cameron Krueger
  * @version March 20, 2021
- * This class creates forces a packet structure that is compatible with the HAC protocol
+ * This class creates an application-layer packet structure that is
+ * compatible with the HAC protocol
  */
 package packet_format;
 
@@ -10,9 +12,8 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-
-import packet_format.Node.Status;
 
 public class HACPack {
 	
@@ -25,12 +26,19 @@ public class HACPack {
 	private Inet4Address address;
 	//   Packet info
 	private PacketType type;
-	private int length;		// Max value 65411
-	private short numFields;  	// Max value 4093
+	private int length;		// Max value 65411 (this will cause issues)
+	private short numFields;  	// Max value 4093 (this will cause issues)
 
 	// Body
 	//   Data
-	private Byte[] data;	// Max length 65411 bytes
+	private byte[] data;	// Max length 65411 bytes
+	
+	private byte[] EMPTY_DATA = {};
+	
+	// Constants
+	public static final short NO_DATA= 0; // Use in instantiation to avoid (short)0
+	public static final int MAX_FIELD_COUNT = 4093;	 // Max value for numFields
+	public static final int MAX_DATA_LENGTH = 65411; // Max value for length
 	
 	public enum PacketType {
 		RAW((byte) 0b10000000),
@@ -74,41 +82,39 @@ public class HACPack {
 		}
 	}
 	
-	/**
-	private String header = null; //the command
-	private String body = null; //the not command
-	private int port;
-	private InetAddress IP;
-	*/
-
 	/** 
 	 * Constructs a HAC packet object
 	 * @param id the source node's ID
 	 * @param addr the source node's IP address
-	 * @param fields the number of node info fields in the data block
 	 * @param nodes an array of fields containing node info
-	 * @throws PacketTypeDataMismatchException
+	 * @throws MaxFieldCountExceededException if length of nodes[] is greater than MAX_FIELD_COUNT
 	 */
-	public HACPack(int id, Inet4Address addr, Short numFields, Node nodes[]) throws PacketTypeDataMismatchException {
+	public HACPack(int id, Inet4Address addr, Node[] nodes) throws MaxFieldCountExceededException {
 		this.id = id;
 		this.address = addr;
 		this.type = PacketType.STATUS;
-		this.numFields = numFields;
-		this.length = numFields * 12;	// Each node info field is 12 bytes 
+		if (nodes.length > MAX_FIELD_COUNT) {
+			throw new MaxFieldCountExceededException("field count " + nodes.length
+					+ " exceeds maximum packet field count of " + MAX_FIELD_COUNT + " fields.");
+		} 
+		else {
+			this.numFields = (short) nodes.length;
+		}
+		this.length = nodes.length * 12;	// Each node info field is 12 bytes 
 		for (Node n: nodes) {
-			n.toByteArray();
+			n.toByteArray();  	// FIXME
 		}
 	}
-
+	
 	/**
 	 * Constructs a HAC packet object
 	 * @param id the source node's ID
 	 * @param addr the source node's IP address
 	 * @param type the packet type
-	 * @param length the length of the data block
 	 * @param data packet data
+	 * @throws MaxDataLengthExceededException if data is longer than max packet data block size
 	 */
-	public HACPack(int id, Inet4Address addr, PacketType type, short length, Byte[] data){
+	public HACPack(int id, Inet4Address addr, PacketType type, byte[] data) throws MaxDataLengthExceededException{
 		this.id = id;
 		this.address = addr;
 		this.type = type;
@@ -121,35 +127,57 @@ public class HACPack {
 			|| type == PacketType.RESEND) {
 			this.length = 0;
 		} else {
-			this.length = length;
+			if (data.length > MAX_DATA_LENGTH) {
+				throw new MaxDataLengthExceededException("data byte array length " + data.length
+						+ " exceeds maximum packet data block size of " + MAX_DATA_LENGTH + " bytes.");
+			}
+			this.length = data.length;
 		}
 		this.numFields = 0;
 		this.data = data;
 	}
-
 	
 	/**
-	 * Copy constructor
-	 * @param hp the HAC packet object to copy
+	 * Constructs a HAC packet object. This constructor is only applicable for
+	 * PING, ACK, INIT, CRQ, and RESEND packets, as their data block is empty 
+	 * @param id the source node's ID
+	 * @param addr the source node's IP address
+	 * @param type the packet type
+	 * @throws PacketTypeDataMismatchException if type is not one of the no-data packet types 
 	 */
-	public HACPack(HACPack hp) {
-		this.port = hp.port;
-		this.address = hp.address; 
-		this.id = hp.id;
-		this.type = hp.type;
-		this.length = hp.length;
-		this.numFields = hp.numFields;
-		this.data = hp.data;
+	public HACPack(int id, Inet4Address addr, PacketType type) throws PacketTypeDataMismatchException {
+		this.id = id;
+		this.address = addr;
+		this.type = type;
+		// Ping, Ack, Init, CRQ, and Resend packets do not carry information in data field
+		//  TODO Why did I add a resend flag? What is this for?
+		if (!(type == PacketType.PING
+			|| type == PacketType.ACK
+			|| type == PacketType.INIT
+			|| type == PacketType.CRQ
+			|| type == PacketType.RESEND)) {
+			throw new PacketTypeDataMismatchException("Packet type " + type.toString() + " not valid for no-data constructor.");
+		}
+		this.numFields = 0;
+		this.data = EMPTY_DATA;
 	}
-	
+
 	/**
 	 * Constructs a HACPack object from a byte array (used when decoding
 	 * DatagramPacket objects)
 	 */
-	public HACPack(Byte[] b) {
+	public HACPack(byte[] b) {		
 		ArrayList<Byte> tmp = new ArrayList<Byte>();
+		
+		// Must convert byte array to Byte array
+		Byte[] in = new Byte[b.length];
+		int i = 0;
+		for (byte bo: b) {
+			in[i++] = (Byte) bo;
+		}
+		
 		// Populate
-		Collections.addAll(tmp, b);
+		Collections.addAll(tmp, in);
 		
 		// Get source address
 		// Inet4Address is actually just a 32 bit value, 4 bytes
@@ -182,11 +210,24 @@ public class HACPack {
 		// Highest 4 bits are empty            !
 		this.id = ((tmp.get(10) << 8) & 0x0F) + (tmp.get(11));
 		
-		// Load the rest of the data into the data block
-		Byte[] a = new Byte[tmp.subList(12, tmp.size()).size()];
-		this.data = tmp.subList(12, tmp.size()).toArray(a);
+		// Load the data into the data block (using original byte array avoids
+		// O(n) type conversion)
+		this.data = Arrays.copyOfRange(b, 12, b.length);
 	}
 	
+	/**
+	 * Copy constructor
+	 * @param hp the HAC packet object to copy
+	 */
+	public HACPack(HACPack hp) {
+		this.port = hp.port;
+		this.address = hp.address; 
+		this.id = hp.id;
+		this.type = hp.type;
+		this.length = hp.length;
+		this.numFields = hp.numFields;
+		this.data = hp.data;
+	}
 	
 	/**
 	 * @return the source node's id
@@ -257,7 +298,7 @@ public class HACPack {
 	/**
 	 * @return the packet's data block as a byte array
 	 */
-	public Byte[] getData() {
+	public byte[] getData() {
 		return data;
 	}
 
@@ -298,9 +339,12 @@ public class HACPack {
 	}
 	
 	/**
-	 * Converts HAC packet object to an array of bytes
+	 * Converts HAC packet object to an array of Bytes
 	 */
-	public Byte[] toByteArray() {
+	// FIXME convert methods that return Byte or accept as param
+	// need to be changed so that they input/output byte (primitive)
+	// so that conversions aren't required everywhere
+	public byte[] toByteArray() {
 		ArrayList<Byte> tmp = new ArrayList<Byte>();
 		
 		// Add source IP address
@@ -334,11 +378,27 @@ public class HACPack {
 		tmp.add((byte) ((this.numFields >> 8) & 0x0F));	// Higher byte
 		tmp.add((byte) (this.numFields & 0xFF));		// Lower byte
 		
+		// Must convert data byte array to Byte array
+		Byte[] dataBytes = new Byte[this.data.length];
+		int i = 0;
+		for (byte bo: this.data) {
+			dataBytes[i++] = (Byte) bo;
+		}
 		// Add data block
-		Collections.addAll(tmp, this.data);
+		Collections.addAll(tmp, dataBytes);
 		
+		// Must convert ArrayList to Byte Array
 		Byte[] b = new Byte[tmp.size()];
-		return tmp.toArray(b);		
+		b = tmp.toArray(b);
+		
+		// Now convert Byte array to byte array (Java is the bane of my
+		// existence)
+		byte[] out = new byte[b.length];
+		int j = 0;
+		for (Byte bo: b) {
+			out[j++] = (byte) bo;
+		}
+		return out;
 	}
 
 	/**
@@ -354,6 +414,9 @@ public class HACPack {
 				port);
 	}
 
+	/**
+	 * @return a copy of this HACPack object
+	 */
 	public HACPack copy() {
 		return new HACPack(this);
 	}
@@ -385,8 +448,7 @@ public class HACPack {
 	public String toString() {
 		return this.id + " " + this.address + " " + this.type.toString() + " " + length + " " + data;
 	}
-	
-	
+
 	/**
 	 * @author cameron
 	 * Tis an Exception. Use when the user makes a non-status packet and tries
@@ -394,6 +456,28 @@ public class HACPack {
 	 */
 	public class PacketTypeDataMismatchException extends Exception {
 		public PacketTypeDataMismatchException(String s) {
+			super(s);
+		}
+	}
+	
+	/**
+	 * @author cameron
+	 * Use when the user tries to specify a data block length greater than
+	 * 65411 bytes
+	 */
+	public class MaxDataLengthExceededException extends Exception {
+		public MaxDataLengthExceededException(String s) {
+			super(s);
+		}
+	}
+	
+	/**
+	 * @author cameron
+	 * Use when the user tries to specify a node info field count greater than
+	 * 4093 fields
+	 */
+	public class MaxFieldCountExceededException extends Exception {
+		public MaxFieldCountExceededException(String s) {
 			super(s);
 		}
 	}

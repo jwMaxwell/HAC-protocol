@@ -1,9 +1,9 @@
 # Example config file. Lines beginning with # are considered comments and are
 # skipped. Lines containing node records follow the format
-#    address, port
-# where the address is the node's IP address or hostname, and port is the port
-# number on which the node's HAC P2P application is listening. The default
-# port is 9876 (there is currently no way to use another port when launching
-# via the command line)
+#    id, address, port
+# where id is the node's system-wide id number, address is the node's IP
+# address or hostname, and port is the port number on which the node's HAC P2P
+# application is listening. The default port is 9876 (there is currently no way
+# to use another port when launching via the command line)
 
-127.0.0.1, 9876
+0, 127.0.0.1, 9876
