@@ -73,7 +73,7 @@ public class HACPack {
     return this.body;
   }
   
-  public InetAddress getaddress() {
+  public InetAddress getAddress() {
     return this.IP;
   }
   
@@ -117,5 +117,5 @@ public class HACPack {
   @Override
   public String toString() {
     return this.header + " " + this.body;
-  } 
+  }
 }
