@@ -149,36 +149,40 @@ public class P2P {
 					e.printStackTrace();
 				}
 
-				// If PING packet received, update corresponding record in
+				// If STATUS packet received, update corresponding record in
 				// nodeIndex
 				HACPacket hacPacket = new HACPacket(incomingPacket.getData());
-				switch (hacPacket.getPacketType()) {
-					case PING:
-						for (Node n : nodeIndex) {
-							if (n.getAddress().equals(senderIP)) {
-								n.setStatus(Node.Status.ACTIVE);
-								n.setTOLC(System.currentTimeMillis());
-								// System.out.println("Ping received"); // DEBUG
-								break;
-							}
-						}
-						break;
-					case STATUS:
-						Node[] recNodes = hacPacket.getDataAsNodeList();
-						// Go through each local node record and update info
-						for (Node n : nodeIndex) {
-							for (Node receivedNode: recNodes) {
-								if (receivedNode.getId() == n.getId()) {
-									n.setStatus(receivedNode.getStatus());
-									n.setTOLC(receivedNode.getTOLC());
+				if (senderIP != null) {		// Should only be set if packet was received
+					switch (hacPacket.getPacketType()) {
+					
+						case PING:
+							for (Node n : nodeIndex) {
+								if (n.getAddress().equals(senderIP)) {
+									n.setStatus(Node.Status.ACTIVE);
+									n.setTOLC(System.currentTimeMillis());
+									// System.out.println("Ping received"); // DEBUG
 									break;
-								}								
+								}
 							}
-						}
-						break;
-					default:
-						System.err.printf("ERROR: Unknown packet type. Raw byte %x", hacPacket.getPacketType());
-						break;
+							break;
+							
+						case STATUS:
+							Node[] recNodes = hacPacket.getDataAsNodeList();
+							// Go through each local node record and update info
+							for (Node n : nodeIndex) {
+								for (Node receivedNode: recNodes) {
+									if (receivedNode.getId() == n.getId()) {
+										n.setStatus(receivedNode.getStatus());
+										n.setTOLC(receivedNode.getTOLC());
+									}								
+								}
+							}
+							break;
+							
+						default:
+							System.err.printf("ERROR: Unknown packet type. Raw byte %x", hacPacket.getPacketType().value);
+							break;
+					}
 				}
 
 				// If a node has not been heard from in more than NODE_TIMEOUT
