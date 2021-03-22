@@ -103,16 +103,16 @@ public final class HACPacket {
 			this.numFields = (short) nodes.length;
 		}
 		this.length = nodes.length * Node.BYTES;	// Each node info field is 12 bytes 
+		
+		// Convert node array to bytes and set data block
 		byte[] tmp = new byte[this.length];
 		int i = 0;
 		for (Node n: nodes) {
 			for (byte b: n.toByteArray()) {
 				tmp[i++] = b;  	// FIXME
 			}
-			System.out.println("Success");
 		}
 		this.data = tmp;
-		
 	}
 	
 	/**
@@ -207,6 +207,9 @@ public final class HACPacket {
 		// Get source length
 		// Int is 32 bits wide, but we're only using lower 16, 2 bytes
 		this.length = (tmp.get(6) << 8) + (tmp.get(7));
+		
+		// Set numFields based on length
+		this.numFields = (short) ((short) this.length/(short)Node.BYTES);
 		
 		// Get type flags
 		// Type is already stored in a byte

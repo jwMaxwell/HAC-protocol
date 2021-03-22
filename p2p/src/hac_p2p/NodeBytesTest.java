@@ -7,10 +7,11 @@ import java.util.ArrayList;
 
 import packet_format.*;
 import packet_format.HACPacket.MaxFieldCountExceededException;
+import packet_format.HACPacket.PacketTypeDataMismatchException;
 
 public class NodeBytesTest {
 
-	public static void mainNOTMAINDONTRUNCHANGEFIRST(String[] args) throws UnknownHostException, MaxFieldCountExceededException {
+	public static void main(String[] args) throws UnknownHostException, MaxFieldCountExceededException, PacketTypeDataMismatchException {
 		Node node = new Node(10, "192.168.0.142", 9876);
 		node.setTOLC(System.currentTimeMillis());
 		
@@ -39,6 +40,7 @@ public class NodeBytesTest {
 		DatagramPacket dp = new DatagramPacket(hp.toByteArray(), hp.toByteArray().length);
 				
 		HACPacket retHp = new HACPacket(dp.getData());
+		System.out.println(retHp.getNumFields());
 		
 		Node[] arn = retHp.getDataAsNodeList();
 		
