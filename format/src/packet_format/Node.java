@@ -23,7 +23,7 @@ public final class Node {
 	private int port;
 	private long tolc;
 	
-	public static final int BYTES = 12; // A node uses 12 bytes when stored in a byte array
+	public static final int BYTES = 16; // A node uses 12 bytes when stored in a byte array
 	
 	// Status bits
 	public enum Status {

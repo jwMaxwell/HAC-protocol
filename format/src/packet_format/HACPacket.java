@@ -102,7 +102,7 @@ public final class HACPacket {
 		else {
 			this.numFields = (short) nodes.length;
 		}
-		this.length = nodes.length * 12;	// Each node info field is 12 bytes 
+		this.length = nodes.length * Node.BYTES;	// Each node info field is 12 bytes 
 		for (Node n: nodes) {
 			n.toByteArray();  	// FIXME
 		}
@@ -308,7 +308,7 @@ public final class HACPacket {
 		Node[] nodes = new Node[this.numFields];
 		for (int i = 0; i < this.numFields; i ++) {
 			try {		// This is a nightmare.
-				nodes[i] = new Node(Arrays.copyOfRange(this.data, i * 12, (i * 12) + 12));
+				nodes[i] = new Node(Arrays.copyOfRange(this.data, i * Node.BYTES, (i * Node.BYTES) + Node.BYTES));
 			} catch (UnknownHostException e) {			// Look at these majik numbers
 				short id = (short) ((this.data[i * 12] << 8 & 0xFF) + this.data[i * 12] & 0xFF);
 				System.err.println("ERROR: Could not convert node with ID " + id
