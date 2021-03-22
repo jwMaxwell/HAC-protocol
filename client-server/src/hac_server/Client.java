@@ -4,12 +4,6 @@
  * @version March 7, 2021
  * This program acts as a client which will be connected
  * to either a host (P2P) or a server
- * 
- * TODO
- * 2. Implement the PING message
- * 3. Implement the BACK message
- * 4. Implement the WTF command
- * 
  */
 
 package hac_server;
@@ -19,10 +13,11 @@ import java.net.*;
 import java.security.SecureRandom;
 
 import packet_format.HACPack;
-import packet_format.HACSock;
+import packet_format.HACPacket;
+import packet_format.HACPacket.PacketTypeDataMismatchException;
 
 public class Client {
-  HACSock socket = null;
+  DatagramSocket socket = null;
   Node parent = null;
   boolean gotPackyBoi = false;
   final int PACKET_SIZE = 1028;
@@ -30,63 +25,62 @@ public class Client {
   /**
    * constructor connects to the host
    * @throws IOException 
+   * @throws PacketTypeDataMismatchException 
    */
-  public Client() throws IOException 
+  public Client() throws IOException, PacketTypeDataMismatchException 
   {
-    socket = new HACSock();
+    socket = new DatagramSocket();
     InetAddress IPAddress = InetAddress.getByName("localhost");
     
-    send("JOIN", IPAddress, 9876);
+    HACPacket join = new HACPacket(0,  
+        (Inet4Address) Inet4Address.getLocalHost(), HACPacket.PacketType.INIT);
+    socket.send(join.buildDatagramPacket(IPAddress, 9876));
     
     //waiting for that GOTO msg
-    HACPack incomingPacket = socket.receive();
-    String response = new String(incomingPacket.toString());
+    byte[] dat = new byte[1028];
+    DatagramPacket incomingPacket = new DatagramPacket(dat, dat.length);
+    socket.receive(incomingPacket);
+    HACPacket packet = new HACPacket(incomingPacket.getData());
+    
+    String response = new String(packet.toString());
     
     System.out.println("Response from server:" + response);
     
-    goTo(incomingPacket.toString(), incomingPacket); //feel free to make this better
-    send("PING", this.parent.getIp(), this.parent.getPort());
+    HACPacket reply = new HACPacket(0,  
+        (Inet4Address) Inet4Address.getLocalHost(), HACPacket.PacketType.PING);
+    socket.send(reply.buildDatagramPacket(IPAddress, 9876));
   }
   
   /**
    * Sends and receives packets
+   * @throws PacketTypeDataMismatchException 
    */
-  public void createAndListenSocket() 
+  public void createAndListenSocket() throws PacketTypeDataMismatchException 
   {
     try 
     {
       while(true) {
         new AreYouThere().run();
         
-        HACPack incomingPacket = socket.receive();
-        gotPackyBoi = true;
-        String response = incomingPacket.toString();
+        byte[] dat = new byte[1028];
+        DatagramPacket incomingPacket = new DatagramPacket(dat, dat.length);
+        socket.receive(incomingPacket);
+        HACPacket packet = new HACPacket(incomingPacket.getData());
+        
+        String response = packet.toString();
         
         System.out.println("Response from server:" + response);
         
-        switch(response.split("//s+")[0]) {
-          case "FUCC":
-            send("PING", this.parent.getIp(), this.parent.getPort());
-            break;
-          default:
-            send("PING", this.parent.getIp(), this.parent.getPort());
-            break;
+        socket.send(new HACPacket(0,  
+            (Inet4Address) Inet4Address.getLocalHost(), 
+            HACPacket.PacketType.PING).
+            buildDatagramPacket((Inet4Address) Inet4Address.getLocalHost(), 9876));
         }
       }
-    }
+    
     catch (IOException e) 
     {
       e.printStackTrace();
-    }
-  }
-  
-  private void goTo(String s, HACPack p) throws NumberFormatException, UnknownHostException {
-    String[] tokens = s.split("//s+");
-    String hostType = tokens[1];
-    
-    //checks if host is a server
-    if(hostType.equals("SERVER")) {
-      this.parent = new Node(p.getAddress(), p.getPort());
     }
   }
   
@@ -95,25 +89,6 @@ public class Client {
     System.exit(0);
   }
   
-  /**
-   * Sends a given message to a given destination
-   * @param message the message to be sent
-   * @param IPAddress the IP address to send it to
-   * @param port the port number to aim at
-   * @return whether or not the message was successfully sent
-   */
-  private boolean send(String message, InetAddress IPAddress, int port) {
-    HACPack sendPacket = new HACPack(message, IPAddress, 9876);
-    try {
-      this.socket.send(sendPacket);
-      System.out.println("Message sent from client");
-      return true;
-    }
-    catch (IOException e) {
-      e.printStackTrace();
-      return false;
-    }
-  }
   
   public void closeSocket() {
     this.socket.close();
@@ -135,9 +110,10 @@ public class Client {
         long temp = rand.nextLong(); //temp location to make sure that value is valid
         try {
           Thread.sleep(temp >= 0 ? temp % LONGEST_TIME : -temp % LONGEST_TIME); // sleep for abs(temp % MAX_TIME) millis
-          socket.send( //send a packet
-            new HACPack("PING", "null", parent.getIp(), parent.getPort()) // ping pong time
-          );
+          socket.send(new HACPacket(0,  
+              (Inet4Address) Inet4Address.getLocalHost(), 
+              HACPacket.PacketType.PING).
+              buildDatagramPacket((Inet4Address) Inet4Address.getLocalHost(), 9876)); // ping pong time
         } catch (InterruptedException e) { // uh-oh
           System.out.println("lol computer borked");
           e.printStackTrace(/* say wtf happened and where*/);
@@ -145,6 +121,10 @@ public class Client {
         catch (IOException e) { //lmao, hope this doesn't happen
           System.out.println("Yikes, extra hecka borked");
           e.printStackTrace(/* say wtf happened and where*/);
+        }
+        catch (PacketTypeDataMismatchException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
         }
       }
     }
@@ -262,7 +242,7 @@ public class Client {
     }
   }
   
-  public static void main(String[] args) throws IOException 
+  public static void main(String[] args) throws IOException, PacketTypeDataMismatchException 
   {
     Client client = new Client();
     Runtime.getRuntime().addShutdownHook(new Exit(client));
