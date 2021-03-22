@@ -15,8 +15,8 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 import packet_format.*;
-import packet_format.HACPack.MaxDataLengthExceededException;
-import packet_format.HACPack.PacketType;
+import packet_format.HACPacket.MaxDataLengthExceededException;
+import packet_format.HACPacket.PacketType;
 
 import java.util.Random;
 
@@ -151,7 +151,7 @@ public class P2P {
 
 				// If PING packet received, update corresponding record in
 				// nodeIndex
-				HACPack hacPacket = new HACPack(incomingPacket.getData());
+				HACPacket hacPacket = new HACPacket(incomingPacket.getData());
 				switch (hacPacket.getPacketType()) {
 					case PING:
 						for (Node n : nodeIndex) {
@@ -160,6 +160,19 @@ public class P2P {
 								n.setTOLC(System.currentTimeMillis());
 								// System.out.println("Ping received"); // DEBUG
 								break;
+							}
+						}
+						break;
+					case STATUS:
+						Node[] recNodes = hacPacket.getDataAsNodeList();
+						// Go through each local node record and update info
+						for (Node n : nodeIndex) {
+							for (Node receivedNode: recNodes) {
+								if (receivedNode.getId() == n.getId()) {
+									n.setStatus(receivedNode.getStatus());
+									n.setTOLC(receivedNode.getTOLC());
+									break;
+								}								
 							}
 						}
 						break;
@@ -173,7 +186,6 @@ public class P2P {
 				for (Node n : nodeIndex) {
 					if (n.getTSLC() > NODE_TIMEOUT) {
 						n.setStatus(Node.Status.OFFLINE);
-						notifyAllOfFailure(n);
 					}
 				}
 
@@ -332,10 +344,56 @@ public class P2P {
 			System.out.println(String.format("%-15s  %-6s  %d", addr, status, n.getTSLC()));
 		}
 	}
+	
+	/**
+	 * Sends heartbeat and status to all nodes in nodeIndex
+	 */
+	// This is used in continuous state-transfer architecture
+	public static void sendHeartbeat() {
+		// Set up socket
+		DatagramSocket socket = null;
+
+		// Construct a byte array containing nodeIndex for the HACPack
+		// data block
+		byte[] nodeIndexByteArray = new byte[nodeIndex.size() * Node.BYTES];
+		int i = 0;
+		for (Node n : nodeIndex) {
+			for (byte b: n.toByteArray()) {
+				nodeIndexByteArray[i++] = b;
+			}
+		}
+
+		for (Node n : nodeIndex) {
+			// Create a HAC STATUS packet, add all records in nodeIndex, and
+			// put it in the data block
+			byte[] outgoingData = null;
+			try {
+				outgoingData = (new HACPacket(id, address, PacketType.STATUS, nodeIndexByteArray)).toByteArray();
+			} catch (MaxDataLengthExceededException e1) {
+				// Ping packets are safe. Will not throw this exception
+				e1.printStackTrace();
+			}
+			DatagramPacket outgoingPacket = new DatagramPacket(outgoingData, outgoingData.length);
+
+			try {
+				socket = new DatagramSocket(port);
+				socket.connect(n.getAddress(), port);
+				socket.send(outgoingPacket);
+				socket.close();
+			} catch (UnknownHostException e) {
+				e.printStackTrace();
+			} catch (SocketException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
 
 	/**
 	 * Sends the PING signal to all nodes in nodeIndex
 	 */
+	@Deprecated // This is NOT used in continuous state-transfer architecture
 	public static void pingAll() {
 		// Set up socket
 		DatagramSocket socket = null;
@@ -345,7 +403,7 @@ public class P2P {
 			// Create a HAC ping packet and put it in the data block
 			byte[] outgoingData = null;
 			try {
-				outgoingData = (new HACPack(id, address, PacketType.PING, b)).toByteArray();
+				outgoingData = (new HACPacket(id, address, PacketType.PING, b)).toByteArray();
 			} catch (MaxDataLengthExceededException e1) {
 				// Ping packets are safe. Will not throw this exception
 				e1.printStackTrace();
@@ -368,12 +426,10 @@ public class P2P {
 	}
 	
 	/**
-	 * I literally cannot see how this is useful. If there are n nodes in the
-	 * system and all nodes perform this action	simultaneously, network traffic
-	 * would spike by n*n, potentially leading to a cascade of "false positive"
-	 * node failures 
+	 * Update all other nodes that a failure has been detected
 	 * @param n the node which has failed
 	 */
+	@Deprecated
 	public static void notifyAllOfFailure(Node n) {
 		// Set up socket
 		DatagramSocket socket = null;
@@ -383,7 +439,7 @@ public class P2P {
 			// Create a HAC ping packet and put it in the data block
 			byte[] outgoingData = null;
 			try {
-				outgoingData = (new HACPack(id, address, PacketType.STATUS, n.toByteArray()).toByteArray());
+				outgoingData = (new HACPacket(id, address, PacketType.STATUS, n.toByteArray()).toByteArray());
 			} catch (MaxDataLengthExceededException e1) {
 				// This mathematicallly cannot happen, as only one node is
 				// being passed to the HACPack constructor 
