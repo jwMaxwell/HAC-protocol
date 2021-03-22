@@ -93,7 +93,7 @@ public class P2P {
 			// Ping all known hosts to let them know you've arrived
 			System.out.println("Pinging all nodes");
 			System.out.println();
-			pingAll();
+			sendHeartbeat();
 
 			// The amount of time spent receiving/accepting commands
 			// This ensures a random interval between pings between 0 and 30
@@ -153,6 +153,7 @@ public class P2P {
 				// nodeIndex
 				HACPacket hacPacket = new HACPacket(incomingPacket.getData());
 				if (senderIP != null) {		// Should only be set if packet was received
+					System.out.println("Packet received\n");
 					switch (hacPacket.getPacketType()) {
 					
 						case PING:
