@@ -4,26 +4,24 @@
  * @version March 6, 2021
  * 
  * This programs acts as the server mode for the HAC protocol
- * 
- * TODO
- * 1. detect when a client becomes inactive
- * 2. fill the cache and keep it a reasonable size
- * 3. probably something else
  */
 
 package hac_server;
 
 import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 
-import packet_format.HACPack;
-import packet_format.HACSock;
+import packet_format.HACPacket;
+import packet_format.HACPacket.PacketTypeDataMismatchException;
 
 public class Server {
-	HACSock socket = null;
+	DatagramSocket socket = null;
 	ArrayList<Node> nodes = new ArrayList<Node>(); //yikes
 	ArrayList<String> cache = new ArrayList<String>();
 	final int PORT = 9876;
@@ -34,13 +32,14 @@ public class Server {
 	
 	/**
 	 * Listens for client messages and responds accordingly
+	 * @throws PacketTypeDataMismatchException 
 	 */
-	public void createAndListenSocket() 
+	public void createAndListenSocket() throws PacketTypeDataMismatchException 
 	{
     try 
     {
       //makes the socket
-      socket = new HACSock(PORT);
+      socket = new DatagramSocket(PORT);
       byte[] incomingData = new byte[PACKET_SIZE];
       
       new SendPings().run();
@@ -49,8 +48,11 @@ public class Server {
       while (true) 
       {
         //listens for shit
-        HACPack incomingPacket = socket.receive();
-        String message = incomingData.toString();
+        DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
+        socket.receive(incomingPacket);
+        HACPacket packet = new HACPacket(incomingPacket.getData());
+        
+        String message = new String(incomingPacket.getData());
         InetAddress IPAddress = incomingPacket.getAddress();
         int port = incomingPacket.getPort();
         
@@ -60,17 +62,18 @@ public class Server {
         System.out.println("Client port: " + port);
         
         //split up that bad boy and get the first word
-        String command = incomingPacket.getHeader();
+        HACPacket.PacketType command = packet.getPacketType();
         
-        if(command.equals("JOIN")) {
-          HACPack replyPacket = 
-              new HACPack(goTo(new Node(IPAddress, port)), IPAddress, port);
-          
-          socket.send(replyPacket);
+        if(command.equals(HACPacket.PacketType.INIT)) {
+          HACPacket reply = new HACPacket(0,  
+              (Inet4Address) Inet4Address.getLocalHost(), HACPacket.PacketType.STATUS);
+          socket.send(reply.buildDatagramPacket(IPAddress, port));
         }
         else 
           //sends a pingy boi
-          socket.send(new HACPack("PING", "null", IPAddress, port));
+          socket.send(new HACPacket(0,  
+              (Inet4Address) Inet4Address.getLocalHost(), 
+              HACPacket.PacketType.PING).buildDatagramPacket(IPAddress, port));
       }
     } 
     catch (SocketException e) 
@@ -81,18 +84,6 @@ public class Server {
     {
       i.printStackTrace();
     } 
-	}
-	
-	/**
-	 * Adds the client to the list of known clients
-	 * @param s the Client
-	 * @return the string to send the the client (where to go)
-	 */
-	public String goTo(Node s) {
-	  if(!nodes.contains(s)) {
-	    nodes.add(s);
-	  }
-	  return "GOTO SERVER";
 	}
 	
 	/**
@@ -125,9 +116,9 @@ public class Server {
   	    try {
           Thread.sleep(temp >= 0 ? temp % MAX_TIME : -temp % MAX_TIME); // sleep for abs(temp % MAX_TIME) millis
           for(Node n : nodes) // for each node in the node list
-            socket.send( //send a packet
-              new HACPack("PING", "null", n.getIp(), n.getPort()) // ping pong time
-            );
+            socket.send(new HACPacket(0,  
+                (Inet4Address) Inet4Address.getLocalHost(), 
+                HACPacket.PacketType.PING).buildDatagramPacket(n.getIp(), n.getPort()));
         } catch (InterruptedException e) { // uh-oh
           System.out.println("lol computer borked");
           e.printStackTrace(/* say wtf happened and where*/);
@@ -135,6 +126,10 @@ public class Server {
         catch (IOException e) { //lmao, hope this doesn't happen
           System.out.println("Yikes, extra hecka borked");
           e.printStackTrace(/* say wtf happened and where*/);
+        }
+        catch (PacketTypeDataMismatchException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
         }
 	    }
 	  }
@@ -178,7 +173,13 @@ public class Server {
   {
     Server server = new Server();
     Runtime.getRuntime().addShutdownHook(new Exit(server));
-    server.createAndListenSocket();
+    try {
+      server.createAndListenSocket();
+    }
+    catch (PacketTypeDataMismatchException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
     
   }
 }
