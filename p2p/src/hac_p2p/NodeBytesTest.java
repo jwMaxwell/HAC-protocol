@@ -1,12 +1,16 @@
 package hac_p2p;
 
+import java.net.DatagramPacket;
+import java.net.Inet4Address;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 
 import packet_format.*;
+import packet_format.HACPacket.MaxFieldCountExceededException;
 
 public class NodeBytesTest {
 
-	public static void mainNOTMAINDONTRUNCHANGEFIRST(String[] args) throws UnknownHostException {
+	public static void mainNOTMAINDONTRUNCHANGEFIRST(String[] args) throws UnknownHostException, MaxFieldCountExceededException {
 		Node node = new Node(10, "192.168.0.142", 9876);
 		node.setTOLC(System.currentTimeMillis());
 		
@@ -28,15 +32,25 @@ public class NodeBytesTest {
 		// Convert to bytes
 		byte[] nodeBytes = node.toByteArray();
 		
+		Node[] n = {node};
+		
+		HACPacket hp = new HACPacket(10, (Inet4Address) Inet4Address.getLocalHost(), n);
+		
+		DatagramPacket dp = new DatagramPacket(hp.toByteArray(), hp.toByteArray().length);
+				
+		HACPacket retHp = new HACPacket(dp.getData());
+		
+		Node[] arn = retHp.getDataAsNodeList();
+		
 		// Convert back
-		Node convNode = new Node(nodeBytes);
+		Node convNode = arn[0]; // Node(nodeBytes);
 		
 		System.out.println();
 		
 		
 		// Display after
 		System.out.println(String.format("%-5s  %-15s  %-6s  %s", "ID", "Address", "Status", "TSLC (ms)"));
-		status = node.isOnline() ? "Up" : "Down";
+		status = convNode.isOnline() ? "Up" : "Down";
 		addr = "";
 		
 		// Use host.domain text address if provided

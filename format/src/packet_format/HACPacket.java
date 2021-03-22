@@ -103,9 +103,16 @@ public final class HACPacket {
 			this.numFields = (short) nodes.length;
 		}
 		this.length = nodes.length * Node.BYTES;	// Each node info field is 12 bytes 
+		byte[] tmp = new byte[this.length];
+		int i = 0;
 		for (Node n: nodes) {
-			n.toByteArray();  	// FIXME
+			for (byte b: n.toByteArray()) {
+				tmp[i++] = b;  	// FIXME
+			}
+			System.out.println("Success");
 		}
+		this.data = tmp;
+		
 	}
 	
 	/**
