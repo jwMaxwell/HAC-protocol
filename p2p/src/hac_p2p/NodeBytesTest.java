@@ -11,7 +11,7 @@ import packet_format.HACPacket.PacketTypeDataMismatchException;
 
 public class NodeBytesTest {
 
-	public static void main(String[] args) throws UnknownHostException, MaxFieldCountExceededException, PacketTypeDataMismatchException {
+	public static void mainNOTMAINDONTRUNCHANGEFIRST(String[] args) throws UnknownHostException, MaxFieldCountExceededException, PacketTypeDataMismatchException {
 		Node node = new Node(10, "192.168.0.142", 9876);
 		node.setTOLC(System.currentTimeMillis());
 		

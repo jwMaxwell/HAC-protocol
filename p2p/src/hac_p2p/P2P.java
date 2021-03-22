@@ -61,7 +61,7 @@ public class P2P {
 	 * @param args args[0] can optionally contain an alternate config file path
 	 * @throws IOException for call to System.in.available(). Not sure when.
 	 */
-	public static void mainNOTMAINDONTRUNCHANGEFIRST(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException {
 		// Load from specified path, if provided
 		if (args.length > 0 && args[0] != null) {
 			cfgPath = args[0];
