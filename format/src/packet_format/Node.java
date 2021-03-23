@@ -69,7 +69,7 @@ public final class Node {
 		} finally {
 			this.port = port;
 			this.status = Status.OFFLINE;
-			this.tolc = -1;
+			this.tolc = 0;
 		}
 	}
 	
@@ -88,7 +88,7 @@ public final class Node {
 			this.id = -1;
 			this.port = port;
 			this.status = Status.OFFLINE;
-			this.tolc = -1;
+			this.tolc = 0;
 		}
 	}	
 	
@@ -123,12 +123,13 @@ public final class Node {
 		
 		// tslc is a long, but we only use 48 bits. 6 bytes
 		//  (2^48 ms is roughly 8925.5 years)
+		System.out.printf("0x%x\n", ((b[10] & 0xff) << 40));
 		long tslc = ((b[10] & 0xff) << 40) + ((b[11] & 0xff) << 32) + ((b[12] & 0xff) << 24)
 				+ ((b[13] & 0xff) << 16) + ((b[14] & 0xff) << 8) + (b[15] & 0xff);
 		if (tslc > 1) {
 			this.tolc = System.currentTimeMillis() - tslc;
 		} else {
-			this.tolc = -1;
+			this.tolc = 0;
 		}
 	}
 	
@@ -208,6 +209,9 @@ public final class Node {
 	 *             System.currenTimeMillis()
 	 */
 	public void setTOLC(long tolc) {
+		if (tolc < 0) {		// Tolc is initialized to 0
+			tolc = 0;
+		}
 		this.tolc = tolc;
 	}	
 
@@ -219,8 +223,8 @@ public final class Node {
 	 *         this node
 	 */
 	public long getTSLC() {
-		if (this.tolc > -1) {
-			return System.currentTimeMillis() - this.tolc;
+		if (this.tolc > 0) {
+			return (System.currentTimeMillis() - this.tolc);
 		}
 		return -1;
 	}
@@ -265,7 +269,7 @@ public final class Node {
 		Byte[] b = new Byte[tmp.size()];
 		b = tmp.toArray(b);
 		
-		// Now convert Byte array to byte array (Java is terrible)
+		// Now convert Byte array to byte array (Java makes me sad)
 		byte[] out = new byte[b.length];
 		int i = 0;
 		for (Byte bo: b) {

@@ -178,7 +178,7 @@ public final class HACPacket {
 	public HACPacket(byte[] b) {
 		
 		// Print packet as hex block
-		/**int lim = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
+		int lim = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
 		int j = 0;
 		for (byte byteInB: b) {
 			System.out.printf("0x%02x ", byteInB);
@@ -188,7 +188,6 @@ public final class HACPacket {
 			if (j > lim) break;
 		}
 		System.out.println();
-		*/
 		
 		// Get source address
 		// Inet4Address is actually just a 32 bit value, 4 bytes
