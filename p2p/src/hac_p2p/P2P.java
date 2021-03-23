@@ -194,7 +194,7 @@ public class P2P {
 									}
 								}
 								if (isNewNode) {
-									System.out.println("INFO: Node at " + receivedNode.getId() + " has joined\n");
+									System.out.println("INFO: Node at " + receivedNode.getAddress() + " has joined\n");
 									nodeIndex.add(receivedNode);									
 								}
 							}
