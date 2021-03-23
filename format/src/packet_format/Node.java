@@ -123,8 +123,8 @@ public final class Node {
 		
 		// tslc is a long, but we only use 48 bits. 6 bytes
 		//  (2^48 ms is roughly 8925.5 years)
-		long tslc = ((b[10] * 0xff) << 40) + ((b[11] * 0xff) << 32) + ((b[12] * 0xff) << 24)
-				+ ((b[13] * 0xff) << 16) + ((b[14] * 0xff) << 8) + (b[15] * 0xff);
+		long tslc = ((b[10] & 0xff) << 40) + ((b[11] & 0xff) << 32) + ((b[12] & 0xff) << 24)
+				+ ((b[13] & 0xff) << 16) + ((b[14] & 0xff) << 8) + (b[15] & 0xff);
 		if (tslc > 1) {
 			this.tolc = System.currentTimeMillis() - tslc;
 		} else {
