@@ -41,6 +41,7 @@ public final class HACPacket {
 	public static final short NO_DATA= 0; // Use in instantiation to avoid (short)0
 	public static final int MAX_FIELD_COUNT = 4093;	 // Max value for numFields
 	public static final int MAX_DATA_LENGTH = 65411; // Max value for length
+	public static final int HEADER_LENGTH = 12;
 	
 	public enum PacketType {
 		RAW((byte) 0b10000000),
@@ -113,6 +114,16 @@ public final class HACPacket {
 			}
 		}
 		this.data = tmp;
+		/*int lim = tmp.length;
+		int j = 0;
+		for (byte byteInB: tmp) {
+			System.out.printf("0x%02x ", byteInB);
+			if (j++ % 4 == 3) {
+				System.out.println();
+			}
+			if (j > lim) break;
+		}
+		System.out.println();*/
 	}
 	
 	/**
@@ -178,16 +189,18 @@ public final class HACPacket {
 	public HACPacket(byte[] b) {
 		
 		// Print packet as hex block
-		int lim = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
+		/*int lim = ((b[6] & 0xff) << 8) + (b[7] & 0xff) + HEADER_LENGTH;
+		System.out.println("Packet from byte[] constructor");
+		System.out.println("Length from packet " + lim);
 		int j = 0;
 		for (byte byteInB: b) {
 			System.out.printf("0x%02x ", byteInB);
 			if (j++ % 4 == 3) {
 				System.out.println();
 			}
-			if (j > lim) break;
+			if (j == lim) break;
 		}
-		System.out.println();
+		System.out.println();*/
 		
 		// Get source address
 		// Inet4Address is actually just a 32 bit value, 4 bytes
@@ -222,7 +235,7 @@ public final class HACPacket {
 		
 		// Load the data into the data block (using original byte array avoids
 		// O(n) type conversion)
-		this.data = Arrays.copyOfRange(b, 12, b.length);
+		this.data = Arrays.copyOfRange(b, HEADER_LENGTH, b.length);
 	}
 	
 	/**
@@ -403,14 +416,10 @@ public final class HACPacket {
 		tmp.add((byte) ((this.numFields >> 8) & 0x0f));	// Higher byte
 		tmp.add((byte) (this.numFields & 0xff));		// Lower byte
 		
-		// Must convert data byte array to Byte array
-		Byte[] dataBytes = new Byte[this.data.length];
-		int i = 0;
-		for (byte bo: this.data) {
-			dataBytes[i++] = (Byte) bo;
-		}
 		// Add data block
-		Collections.addAll(tmp, dataBytes);
+		for (byte bo: this.data) {
+			tmp.add(bo);
+		}
 		
 		// Must convert ArrayList to Byte Array
 		Byte[] b = new Byte[tmp.size()];
@@ -424,19 +433,6 @@ public final class HACPacket {
 			out[j++] = (byte) bo;
 		}
 		return out;
-	}
-
-	/**
-	 * Converts HAC packet to a DatagramPacket that can be sent by a socket
-	 * @param IP address of recipient
-	 * @param port port number of recipient
-	 * @return DatagramPacket representation of this HACPacket
-	 */
-	public DatagramPacket buildDatagramPacket(InetAddress IP, int port) {
-		return new DatagramPacket(this.toString().getBytes(),
-				this.toString().getBytes().length,
-				IP,
-				port);
 	}
 
 	/**

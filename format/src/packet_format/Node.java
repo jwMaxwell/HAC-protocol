@@ -117,16 +117,16 @@ public final class Node {
 		port = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
 		
 		// Status is already stored in a byte
-		this.status = Status.getFromByte(b[8]);
+		this.status = Status.getFromByte((byte) ((b[8] & 0xff) >> 5));
 		
 		// Empty byte, reserved for possible future use, skip [9]
 		
 		// tslc is a long, but we only use 48 bits. 6 bytes
 		//  (2^48 ms is roughly 8925.5 years)
-		System.out.printf("0x%x\n", ((b[10] & 0xff) << 40));
+	//System.out.printf("0x%x\n", ((b[10] & 0xff) << 40));
 		long tslc = ((b[10] & 0xff) << 40) + ((b[11] & 0xff) << 32) + ((b[12] & 0xff) << 24)
 				+ ((b[13] & 0xff) << 16) + ((b[14] & 0xff) << 8) + (b[15] & 0xff);
-		if (tslc > 1) {
+		if (tslc > 0) {
 			this.tolc = System.currentTimeMillis() - tslc;
 		} else {
 			this.tolc = 0;
@@ -257,7 +257,12 @@ public final class Node {
 		
 		// tslc is a long, but we only use 48 bits
 		//  (2^48 ms is roughly 8925.5 years)
-		long tslc = getTSLC();
+		long tslc;
+		if (tolc != 0) {
+			tslc = getTSLC();
+		} else {
+			tslc = 0;
+		}
 		tmp.add((byte) ((tslc >> 40) & 0xFF));	// Byte 5
 		tmp.add((byte) ((tslc >> 32) & 0xFF));	// Byte 4
 		tmp.add((byte) ((tslc >> 24) & 0xFF));	// Byte 3
