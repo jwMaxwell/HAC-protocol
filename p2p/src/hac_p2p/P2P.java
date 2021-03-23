@@ -37,7 +37,7 @@ public class P2P {
 
 	// Node lifespan - nodes are assumed to be dead after this long without
 	// contact
-	private static final long NODE_TIMEOUT = 30000;
+	private static final long DEAD_AFTER = 45000;	// 45 SECONDS
 
 	// Node index
 	private static ArrayList<Node> nodeIndex = new ArrayList<Node>();
@@ -78,10 +78,17 @@ public class P2P {
 			address = (Inet4Address) testSocket.getLocalAddress();
 			System.out.println("This node's address: " + address.getHostAddress());
 		} catch (UnknownHostException e) {
-
 			System.err.println("ERROR: Could not get this node's IP address");
 			stdTerm(false, 3);
 		}
+		
+		// Help
+		System.out.println("At any time, type one of the following and press ENTER"
+				+ " to perform the specified action:");
+		System.out.println("  q - quit");
+		System.out.println("  d - display current node index status");
+		System.out.println("  p - ping all nodes (send heartbeat)");
+		System.out.println();
 
 		// Loop control, for use later
 		// In current implementation, will never be true
@@ -236,7 +243,7 @@ public class P2P {
 				// If a node has not been heard from in more than NODE_TIMEOUT
 				// milliseconds, it is considered dead
 				for (Node n : nodeIndex) {
-					if (n.getTSLC() > NODE_TIMEOUT) {
+					if (n.getTSLC() > DEAD_AFTER) {
 						n.setStatus(Node.Status.OFFLINE);
 					}
 				}
