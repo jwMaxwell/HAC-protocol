@@ -46,7 +46,7 @@ public class P2P {
 
 	// Formal command values
 	private static enum Commands {
-		QUIT, DISPLAY, INVALID, NONE;
+		QUIT, DISPLAY, SEND_HBEAT, INVALID, NONE;
 	}
 	
 	// This node's unique ID
@@ -116,17 +116,7 @@ public class P2P {
 				// Show current list of nodes if more than 5 seconds have
 				// passed
 				if (System.currentTimeMillis() - lastDisplay > 5000) {
-					// Sort nodes by ID
-					boolean isInOrder = false;
-					while (!isInOrder) {
-						isInOrder = true;
-						for (int i = 0; i < nodeIndex.size() - 1; i++) {
-							if (nodeIndex.get(i).getId() > nodeIndex.get(i + 1).getId()) {
-								Collections.swap(nodeIndex, i, i+1);
-								isInOrder = false;
-							}
-						}
-					}
+					sortNodes();
 					displayNodes();
 					System.out.println(); // Blank line
 					lastDisplay = System.currentTimeMillis();
@@ -138,6 +128,7 @@ public class P2P {
 
 				// Sender IP address
 				InetAddress senderIP = null;
+				int senderPort = 0;
 				
 				// Try to receive data with timeout
 				try {
@@ -151,6 +142,7 @@ public class P2P {
 						try {
 							socket.receive(incomingPacket);
 							senderIP = incomingPacket.getAddress();
+							senderPort = incomingPacket.getPort();
 						} catch (SocketTimeoutException e) {
 							// Set flag if timeout reached
 							timedOut = true;
@@ -184,18 +176,10 @@ public class P2P {
 							
 						case STATUS:
 							Node[] recNodes = hacPacket.getDataAsNodeList();
+							
 							// Go through each local node record and update info
 							System.out.println(hacPacket.getNumFields());
-							// Update record for sender node
-							for (Node n: nodeIndex) {
-								if (n.getAddress().equals(senderIP)) {
-									if (n.getStatus() == Node.Status.OFFLINE) {
-										System.out.println("INFO: Node at " + n.getAddress() + " is back online\n");
-									}
-									n.setStatus(Node.Status.ACTIVE);
-									n.setTOLC(System.currentTimeMillis());
-								}
-							}
+							
 							// Update records for other nodes and add new nodes, if present
 							for (Node receivedNode: recNodes) {
 								boolean isNewNode = true; 
@@ -218,6 +202,30 @@ public class P2P {
 									System.out.println("ID: " + receivedNode.getId());
 									nodeIndex.add(receivedNode);									
 								}
+							}
+							
+							// Update record for sender node
+							boolean senderInIndex = false;
+							int nodeCount = 0;
+							for (Node n: nodeIndex) {
+								if (n.getAddress().equals(senderIP)) {
+									senderInIndex = true;
+									if (n.getStatus() == Node.Status.OFFLINE) {
+										System.out.println("INFO: Node at " + n.getAddress() + " is back online\n");
+									}
+									n.setStatus(Node.Status.ACTIVE);
+									n.setTOLC(System.currentTimeMillis());
+									break;	// save a little time
+								}
+								nodeCount++;
+							}
+							// If sender is not in nodeIndex, add
+							if (!senderInIndex) {
+								Node sender = new Node(senderIP.getHostAddress(), senderPort);
+								sender.setId(nodeCount + 1);
+								sender.setStatus(Node.Status.ACTIVE);
+								sender.setTOLC(System.currentTimeMillis());
+								nodeIndex.add(sender);
 							}
 							break;
 							
@@ -256,6 +264,10 @@ public class P2P {
 					lastDisplay = System.currentTimeMillis();
 					System.out.println();
 					displayNodes();
+					break;
+					
+				case SEND_HBEAT:
+					sendHeartbeat();
 					break;
 
 				case INVALID:
@@ -436,6 +448,26 @@ public class P2P {
 			}
 		}
 	}
+	
+	public static void sortNodes() {
+		// Sort nodes by ID
+		boolean isInOrder = false;
+		while (!isInOrder) {
+			isInOrder = true;
+			for (int i = 0; i < nodeIndex.size() - 1; i++) {
+				if (nodeIndex.get(i).getId() > nodeIndex.get(i + 1).getId()) {
+					Collections.swap(nodeIndex, i, i+1);
+					isInOrder = false;
+				}
+			}
+		}
+		
+		// Renumber all to remove gaps in IDs
+		int i = 0;
+		for (Node n: nodeIndex) {
+			n.setId(i++);
+		}
+	}
 
 	/**
 	 * Sends the PING signal to all nodes in nodeIndex
@@ -571,6 +603,8 @@ public class P2P {
 			return Commands.QUIT;
 		} else if (in.equals("d")) {
 			return Commands.DISPLAY;
+		} else if (in.equals("p")) {
+			return Commands.SEND_HBEAT;
 		} else {
 			return Commands.INVALID;
 		}
