@@ -411,6 +411,10 @@ public class P2P {
 		DatagramSocket socket = null;
 
 		for (Node n : nodeIndex) {
+			// Don't send heartbeat to yourself, you won't get it anyway
+			if (n.getAddress() == address) {
+				continue;
+			}
 			// Create a HAC STATUS packet, add all records in nodeIndex, and
 			// put it in the data block
 			byte[] outgoingData = null;
