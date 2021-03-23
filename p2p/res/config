@@ -7,3 +7,4 @@
 # to use another port when launching via the command line)
 
 0, 127.0.0.1, 9876
+2, 192.168.0.134, 9876

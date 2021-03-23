@@ -98,44 +98,33 @@ public final class Node {
 	 * @param b a byte array containing node data
 	 * @throws UnknownHostException if the host cannot be found
 	 */
-	public Node(byte[] b) throws UnknownHostException {
-		ArrayList<Byte> tmp = new ArrayList<Byte>();
-		
-		// Must convert byte array to Byte array
-		Byte[] in = new Byte[b.length];
-		int i = 0;
-		for (byte bo: b) {
-			in[i++] = (Byte) bo;
-		}
-		
-		// Populate
-		Collections.addAll(tmp, in);
-		
-		// Int is 32 bits wide, but we're only using lower 16, 2 bytes
-		this.id = (tmp.get(0) << 8) + (tmp.get(1));
-		
+	public Node(byte[] b) throws UnknownHostException {		
 		// Inet4Address is actually just a 32 bit value, 4 bytes
-		byte[] addr = {tmp.get(5), tmp.get(4), tmp.get(3), tmp.get(2)};
+		byte[] addr = {b[0], b[1], b[2], b[3]};
 		
 		try {
 			// This call will attempt to contact the host at ip
 			this.address = (Inet4Address) Inet4Address.getByAddress(addr);
 		} catch (UnknownHostException e) {
-			System.err.printf("Error: Unknown host: %o.%o.%o.%o", addr[0], addr[1], addr[2], addr[3]);
+			System.err.printf("Error: Unknown host: %d.%d.%d.%d",
+					addr[0] & 0xff, addr[1] & 0xff, addr[2] & 0xff, addr[3] & 0xff);
 		}
 		
-		// Status is already stored in a byte
-		this.status = Status.getFromByte(tmp.get(6));
-		
-		// Empty byte, reserved for possible future use, skip [7]
+		// Int is 32 bits wide, but we're only using lower 16, 2 bytes
+		this.id = ((b[4] & 0xff) << 8) + (b[5] & 0xff);
 		
 		// Port is really unsigned short -- 16 bits
-		port = (tmp.get(8) << 8) + tmp.get(9);
+		port = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
+		
+		// Status is already stored in a byte
+		this.status = Status.getFromByte(b[8]);
+		
+		// Empty byte, reserved for possible future use, skip [9]
 		
 		// tslc is a long, but we only use 48 bits. 6 bytes
 		//  (2^48 ms is roughly 8925.5 years)
-		long tslc = (tmp.get(10) << 40) + (tmp.get(11) << 32) + (tmp.get(12) << 24)
-				+ (tmp.get(13) << 16) + (tmp.get(14) << 8) + tmp.get(15);
+		long tslc = ((b[10] * 0xff) << 40) + ((b[11] * 0xff) << 32) + ((b[12] * 0xff) << 24)
+				+ ((b[13] * 0xff) << 16) + ((b[14] * 0xff) << 8) + (b[15] * 0xff);
 		if (tslc > 1) {
 			this.tolc = System.currentTimeMillis() - tslc;
 		} else {
@@ -242,31 +231,25 @@ public final class Node {
 	public byte[] toByteArray() {
 		ArrayList<Byte> tmp = new ArrayList<Byte>();
 		
+		// Inet4Address is actually just a 32 bit value
+		tmp.add((byte) this.address.getAddress()[0]);	// High byte
+		tmp.add((byte) this.address.getAddress()[1]);	// Byte 1
+		tmp.add((byte) this.address.getAddress()[2]);	// Byte 2
+		tmp.add((byte) this.address.getAddress()[3]);	// Low byte
+		
 		// Int is 32 bits wide, but we're only using lower 16
 		tmp.add((byte) ((this.id >> 8) & 0xFF));	// Higher byte
 		tmp.add((byte) (this.id & 0xFF));			// Lower byte
 		
-		/**
-		 * private Status status;
-		 * private int port;
-		 * private long tolc;
-		 */
-		
-		// Inet4Address is actually just a 32 bit value
-		tmp.add((byte) this.address.getAddress()[3]);	// Byte 3
-		tmp.add((byte) this.address.getAddress()[2]);	// Byte 2
-		tmp.add((byte) this.address.getAddress()[1]);	// Byte 1
-		tmp.add((byte) this.address.getAddress()[0]);	// Byte 0
+		// Port is really unsigned short -- 16 bits
+		tmp.add((byte) ((this.port >> 8) & 0xFF));
+		tmp.add((byte) (this.port  & 0xFF));
 		
 		// Status is already stored in a byte, move into upper 3 bits
 		tmp.add((byte) (this.status.value << 5));
 		
 		// Empty byte, reserved for possible future use
 		tmp.add((byte) 0);
-		
-		// Port is really unsigned short -- 16 bits
-		tmp.add((byte) ((this.port >> 8) & 0xFF));
-		tmp.add((byte) (this.port  & 0xFF));
 		
 		// tslc is a long, but we only use 48 bits
 		//  (2^48 ms is roughly 8925.5 years)

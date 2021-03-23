@@ -71,9 +71,12 @@ public class P2P {
 		input = new Scanner(System.in);
 		
 		// Try to get IP address
-		try {
-			address = (Inet4Address) Inet4Address.getLocalHost();
+		try (final DatagramSocket testSocket = new DatagramSocket()){
+			testSocket.connect(InetAddress.getByName("8.8.8.8"), 10002);
+			address = (Inet4Address) testSocket.getLocalAddress();
+			System.out.println("This node's address: " + address.getHostAddress());
 		} catch (UnknownHostException e) {
+
 			System.err.println("ERROR: Could not get this node's IP address");
 			stdTerm(false, 3);
 		}
@@ -103,9 +106,6 @@ public class P2P {
 			// socket for later
 			DatagramSocket socket = null;
 
-			// Sender IP address
-			InetAddress senderIP = null;
-
 			// Set time of last ping
 			long lastPingTime = System.currentTimeMillis();
 
@@ -123,6 +123,9 @@ public class P2P {
 				byte[] incomingData = new byte[PACKET_SIZE];
 				DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
 
+				// Sender IP address
+				InetAddress senderIP = null;
+				
 				// Try to receive data with timeout
 				try {
 					// Instantiate socket and set the timeout
@@ -151,8 +154,8 @@ public class P2P {
 
 				// If STATUS packet received, update corresponding record in
 				// nodeIndex
-				HACPacket hacPacket = new HACPacket(incomingPacket.getData());
 				if (senderIP != null) {		// Should only be set if packet was received
+					HACPacket hacPacket = new HACPacket(incomingPacket.getData());
 					System.out.println("Packet received\n");
 					switch (hacPacket.getPacketType()) {
 					
@@ -176,6 +179,11 @@ public class P2P {
 										n.setStatus(receivedNode.getStatus());
 										n.setTOLC(receivedNode.getTOLC());
 									}								
+								}
+								// Update record for sender node
+								if (n.getAddress().equals(senderIP)) {
+									n.setStatus(Node.Status.ACTIVE);
+									n.setTOLC(System.currentTimeMillis());
 								}
 							}
 							break;

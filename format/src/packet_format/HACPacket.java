@@ -175,52 +175,38 @@ public final class HACPacket {
 	 * Constructs a HACPack object from a byte array (used when decoding
 	 * DatagramPacket objects)
 	 */
-	public HACPacket(byte[] b) {		
-		ArrayList<Byte> tmp = new ArrayList<Byte>();
-		
-		// Must convert byte array to Byte array
-		Byte[] in = new Byte[b.length];
-		int i = 0;
-		for (byte bo: b) {
-			in[i++] = (Byte) bo;
-		}
-		
-		// Populate
-		Collections.addAll(tmp, in);
-		
+	public HACPacket(byte[] b) {				
 		// Get source address
 		// Inet4Address is actually just a 32 bit value, 4 bytes
-		byte[] sourceAddr = {tmp.get(3), tmp.get(2), tmp.get(1), tmp.get(0)};
+		byte[] sourceAddr = {b[0], b[1], b[2], b[3]};
 		
 		try {
 			// This call will attempt to contact the host at ip
 			this.address = (Inet4Address) Inet4Address.getByAddress(sourceAddr);
 		} catch (UnknownHostException e) {
-			System.err.printf("Error: Unknown host: %o.%o.%o.%o",
-					sourceAddr[0], sourceAddr[1], sourceAddr[2], sourceAddr[3]);
+			System.err.printf("Error: Unknown host: %d.%d.%d.%d",
+					sourceAddr[0] & 0xff, sourceAddr[1] & 0xff, sourceAddr[2] & 0xff, sourceAddr[3] & 0xff);
 		}
 		
 		// Get source id
 		// Int is 32 bits wide, but we're only using lower 16, 2 bytes
-		this.id = (tmp.get(4) << 8) + (tmp.get(5));
+		this.id = ((b[4] & 0xff) << 8) + (b[5] & 0xff);
 
 		// Get source length
 		// Int is 32 bits wide, but we're only using lower 16, 2 bytes
-		this.length = (tmp.get(6) << 8) + (tmp.get(7));
-		
-		// Set numFields based on length
-		this.numFields = (short) ((short) this.length/(short)Node.BYTES);
+		this.length = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
 		
 		// Get type flags
 		// Type is already stored in a byte
-		this.type = PacketType.getFromByte(tmp.get(8));
+		this.type = PacketType.getFromByte(b[8]);
+		System.out.println(this.type.toString());
 	
 		// Next 12 bits are reserved (empty)
 		// Empty byte, skip [9]
 		
 		// Get number of fields
 		// Highest 4 bits are empty            !
-		this.id = ((tmp.get(10) << 8) & 0x0F) + (tmp.get(11));
+		this.numFields = (short) (((short) ((b[10] & 0xff) << 8) & 0x0f) + (short) (b[11] & 0xff));
 		
 		// Load the data into the data block (using original byte array avoids
 		// O(n) type conversion)
@@ -376,24 +362,24 @@ public final class HACPacket {
 		
 		// Add source IP address
 		// Inet4Address is actually just a 32 bit value
-		tmp.add((byte) this.address.getAddress()[3]);	// Byte 3
-		tmp.add((byte) this.address.getAddress()[2]);	// Byte 2
+		tmp.add((byte) this.address.getAddress()[0]);	// High byte
 		tmp.add((byte) this.address.getAddress()[1]);	// Byte 1
-		tmp.add((byte) this.address.getAddress()[0]);	// Byte 0
+		tmp.add((byte) this.address.getAddress()[2]);	// Byte 2
+		tmp.add((byte) this.address.getAddress()[3]);	// Low byte
 		
 		// Add source id
 		// Int is 32 bits wide, but we're only using lower 16
-		tmp.add((byte) ((this.id >> 8) & 0xFF));	// Higher byte
-		tmp.add((byte) (this.id & 0xFF));			// Lower byte
+		tmp.add((byte) ((this.id >> 8) & 0xff));		// Higher byte
+		tmp.add((byte) (this.id & 0xff));				// Lower byte
 		
 		// Add body length
 		// Int is 32 bits wide, but we're only using lower 16
-		tmp.add((byte) ((this.length >> 8) & 0xFF));	// Higher byte
-		tmp.add((byte) (this.length & 0xFF));			// Lower byte
+		tmp.add((byte) ((this.length >> 8) & 0xff));	// Higher byte
+		tmp.add((byte) (this.length & 0xff));			// Lower byte
 		
 		// Add type flags
 		// Type is already stored in a byte
-		tmp.add((byte) (this.type.value & 0xFF));
+		tmp.add((byte) (this.type.value & 0xff));
 		
 		// Next 12 bits are reserved (empty)
 		// Add an empty byte and add the other 4 empty bits in the next step
@@ -402,8 +388,8 @@ public final class HACPacket {
 		
 		// Add number of fields
 		// Highest 4 bits are empty            !
-		tmp.add((byte) ((this.numFields >> 8) & 0x0F));	// Higher byte
-		tmp.add((byte) (this.numFields & 0xFF));		// Lower byte
+		tmp.add((byte) ((this.numFields >> 8) & 0x0f));	// Higher byte
+		tmp.add((byte) (this.numFields & 0xff));		// Lower byte
 		
 		// Must convert data byte array to Byte array
 		Byte[] dataBytes = new Byte[this.data.length];
