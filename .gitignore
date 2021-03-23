@@ -9,4 +9,4 @@ bin/
 /.metadata/
 
 # Sensitive info
-config
+./p2p/res/config

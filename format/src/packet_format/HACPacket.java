@@ -102,6 +102,7 @@ public final class HACPacket {
 		else {
 			this.numFields = (short) nodes.length;
 		}
+		System.out.println("numFields: " + numFields);
 		this.length = nodes.length * Node.BYTES;	// Each node info field is 12 bytes 
 		
 		// Convert node array to bytes and set data block
@@ -175,7 +176,19 @@ public final class HACPacket {
 	 * Constructs a HACPack object from a byte array (used when decoding
 	 * DatagramPacket objects)
 	 */
-	public HACPacket(byte[] b) {				
+	public HACPacket(byte[] b) {
+		
+		int lim = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
+		int j = 0;
+		for (byte byteInB: b) {
+			System.out.printf("0x%02x ", byteInB);
+			if (j++ % 4 == 3) {
+				System.out.println();
+			}
+			if (j > lim) break;
+		}
+		System.out.println();
+		
 		// Get source address
 		// Inet4Address is actually just a 32 bit value, 4 bytes
 		byte[] sourceAddr = {b[0], b[1], b[2], b[3]};
@@ -199,14 +212,13 @@ public final class HACPacket {
 		// Get type flags
 		// Type is already stored in a byte
 		this.type = PacketType.getFromByte(b[8]);
-		System.out.println(this.type.toString());
 	
 		// Next 12 bits are reserved (empty)
 		// Empty byte, skip [9]
 		
 		// Get number of fields
 		// Highest 4 bits are empty            !
-		this.numFields = (short) (((short) ((b[10] & 0xff) << 8) & 0x0f) + (short) (b[11] & 0xff));
+		this.numFields = (short) ((short) ((b[10] & 0xff) << 8) + (short) (b[11] & 0xff));
 		
 		// Load the data into the data block (using original byte array avoids
 		// O(n) type conversion)

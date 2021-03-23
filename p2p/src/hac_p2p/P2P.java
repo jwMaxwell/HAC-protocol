@@ -12,11 +12,14 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Scanner;
 
 import packet_format.*;
 import packet_format.HACPacket.MaxDataLengthExceededException;
 import packet_format.HACPacket.PacketType;
+import packet_format.HACPacket.PacketTypeDataMismatchException;
 
 import java.util.Random;
 
@@ -60,8 +63,9 @@ public class P2P {
 	 * 
 	 * @param args args[0] can optionally contain an alternate config file path
 	 * @throws IOException for call to System.in.available(). Not sure when.
+	 * @throws PacketTypeDataMismatchException 
 	 */
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, PacketTypeDataMismatchException {
 		// Load from specified path, if provided
 		if (args.length > 0 && args[0] != null) {
 			cfgPath = args[0];
@@ -94,8 +98,6 @@ public class P2P {
 		// MAIN LOOP
 		while (!quit) {
 			// Ping all known hosts to let them know you've arrived
-			System.out.println("Pinging all nodes");
-			System.out.println();
 			sendHeartbeat();
 
 			// The amount of time spent receiving/accepting commands
@@ -114,6 +116,17 @@ public class P2P {
 				// Show current list of nodes if more than 5 seconds have
 				// passed
 				if (System.currentTimeMillis() - lastDisplay > 5000) {
+					// Sort nodes by ID
+					boolean isInOrder = false;
+					while (!isInOrder) {
+						isInOrder = true;
+						for (int i = 0; i < nodeIndex.size() - 1; i++) {
+							if (nodeIndex.get(i).getId() > nodeIndex.get(i + 1).getId()) {
+								Collections.swap(nodeIndex, i, i+1);
+								isInOrder = false;
+							}
+						}
+					}
 					displayNodes();
 					System.out.println(); // Blank line
 					lastDisplay = System.currentTimeMillis();
@@ -156,7 +169,6 @@ public class P2P {
 				// nodeIndex
 				if (senderIP != null) {		// Should only be set if packet was received
 					HACPacket hacPacket = new HACPacket(incomingPacket.getData());
-					System.out.println("Packet received\n");
 					switch (hacPacket.getPacketType()) {
 					
 						case PING:
@@ -173,17 +185,38 @@ public class P2P {
 						case STATUS:
 							Node[] recNodes = hacPacket.getDataAsNodeList();
 							// Go through each local node record and update info
-							for (Node n : nodeIndex) {
-								for (Node receivedNode: recNodes) {
-									if (receivedNode.getId() == n.getId()) {
-										n.setStatus(receivedNode.getStatus());
-										n.setTOLC(receivedNode.getTOLC());
-									}								
-								}
-								// Update record for sender node
+							System.out.println(hacPacket.getNumFields());
+							// Update record for sender node
+							for (Node n: nodeIndex) {
 								if (n.getAddress().equals(senderIP)) {
+									if (n.getStatus() == Node.Status.OFFLINE) {
+										System.out.println("INFO: Node at " + n.getAddress() + " is back online\n");
+									}
 									n.setStatus(Node.Status.ACTIVE);
 									n.setTOLC(System.currentTimeMillis());
+								}
+							}
+							// Update records for other nodes and add new nodes, if present
+							for (Node receivedNode: recNodes) {
+								boolean isNewNode = true; 
+								for (Node n: nodeIndex) {
+									if (receivedNode.getAddress().equals(n.getAddress())) {
+										// If node is in list, but has different ID, change ID to match received status
+										if (receivedNode.getId() == n.getId()) {
+											isNewNode = false;
+											n.setStatus(receivedNode.getStatus());
+											n.setTOLC(receivedNode.getTOLC());
+										} else {
+											isNewNode = false;
+											n.setId(receivedNode.getId());
+											n.setStatus(receivedNode.getStatus());
+											n.setTOLC(receivedNode.getTOLC());
+										}
+									}
+								}
+								if (isNewNode) {
+									System.out.println("ID: " + receivedNode.getId());
+									nodeIndex.add(receivedNode);									
 								}
 							}
 							break;
@@ -339,7 +372,7 @@ public class P2P {
 	 */
 	private static void displayNodes() {
 		System.out.println("------------ Node Index ------------");
-		System.out.println(String.format("%-15s  %-6s  %s", "IP", "Status", "TSLC (ms)"));
+		System.out.println(String.format("%-4s  %-15s  %-6s  %s", "ID", "Address", "Status", "TSLC (ms)"));
 
 		// Output node info
 		for (Node n : nodeIndex) {
@@ -354,7 +387,7 @@ public class P2P {
 			}
 			
 			// Print that b!
-			System.out.println(String.format("%-15s  %-6s  %d", addr, status, n.getTSLC()));
+			System.out.println(String.format("%-4s  %-15s  %-6s  %d", n.getId(), addr, status, n.getTSLC()));
 		}
 	}
 	
@@ -363,6 +396,7 @@ public class P2P {
 	 */
 	// This is used in continuous state-transfer architecture
 	public static void sendHeartbeat() {
+		System.out.println("INFO: Pinging all nodes\n");
 		// Set up socket
 		DatagramSocket socket = null;
 
