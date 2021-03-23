@@ -102,7 +102,6 @@ public final class HACPacket {
 		else {
 			this.numFields = (short) nodes.length;
 		}
-		System.out.println("numFields: " + numFields);
 		this.length = nodes.length * Node.BYTES;	// Each node info field is 12 bytes 
 		
 		// Convert node array to bytes and set data block
@@ -110,7 +109,7 @@ public final class HACPacket {
 		int i = 0;
 		for (Node n: nodes) {
 			for (byte b: n.toByteArray()) {
-				tmp[i++] = b;  	// FIXME
+				tmp[i++] = b;  	// FIXME - What needs to be fixed?
 			}
 		}
 		this.data = tmp;
@@ -178,7 +177,8 @@ public final class HACPacket {
 	 */
 	public HACPacket(byte[] b) {
 		
-		int lim = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
+		// Print packet as hex block
+		/**int lim = ((b[6] & 0xff) << 8) + (b[7] & 0xff);
 		int j = 0;
 		for (byte byteInB: b) {
 			System.out.printf("0x%02x ", byteInB);
@@ -188,6 +188,7 @@ public final class HACPacket {
 			if (j > lim) break;
 		}
 		System.out.println();
+		*/
 		
 		// Get source address
 		// Inet4Address is actually just a 32 bit value, 4 bytes

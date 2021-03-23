@@ -17,9 +17,7 @@ import java.util.Collections;
 import java.util.Scanner;
 
 import packet_format.*;
-import packet_format.HACPacket.MaxDataLengthExceededException;
-import packet_format.HACPacket.PacketType;
-import packet_format.HACPacket.PacketTypeDataMismatchException;
+import packet_format.HACPacket.*;
 
 import java.util.Random;
 
@@ -177,10 +175,7 @@ public class P2P {
 						case STATUS:
 							Node[] recNodes = hacPacket.getDataAsNodeList();
 							
-							// Go through each local node record and update info
-							System.out.println(hacPacket.getNumFields());
-							
-							// Update records for other nodes and add new nodes, if present
+							// Update records for existing nodes and add new nodes, if present
 							for (Node receivedNode: recNodes) {
 								boolean isNewNode = true; 
 								for (Node n: nodeIndex) {
@@ -199,7 +194,7 @@ public class P2P {
 									}
 								}
 								if (isNewNode) {
-									System.out.println("ID: " + receivedNode.getId());
+									System.out.println("INFO: Node at " + receivedNode.getId() + " has joined\n");
 									nodeIndex.add(receivedNode);									
 								}
 							}
@@ -412,24 +407,15 @@ public class P2P {
 		// Set up socket
 		DatagramSocket socket = null;
 
-		// Construct a byte array containing nodeIndex for the HACPack
-		// data block
-		byte[] nodeIndexByteArray = new byte[nodeIndex.size() * Node.BYTES];
-		int i = 0;
-		for (Node n : nodeIndex) {
-			for (byte b: n.toByteArray()) {
-				nodeIndexByteArray[i++] = b;
-			}
-		}
-
 		for (Node n : nodeIndex) {
 			// Create a HAC STATUS packet, add all records in nodeIndex, and
 			// put it in the data block
 			byte[] outgoingData = null;
 			try {
-				outgoingData = (new HACPacket(id, address, PacketType.STATUS, nodeIndexByteArray)).toByteArray();
-			} catch (MaxDataLengthExceededException e1) {
-				// Ping packets are safe. Will not throw this exception
+				Node[] tmp = new Node[nodeIndex.size()];
+				outgoingData = (new HACPacket(id, address, nodeIndex.toArray(new Node[nodeIndex.size()])).toByteArray());
+			} catch (MaxFieldCountExceededException e1) {
+				// Don't have time to handle this
 				e1.printStackTrace();
 			}
 			DatagramPacket outgoingPacket = new DatagramPacket(outgoingData, outgoingData.length);
